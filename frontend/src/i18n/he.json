@@ -1,0 +1,32 @@
+{
+  "app": {
+    "name": "חשבוניות",
+    "openMenu": "פתיחת תפריט"
+  },
+  "nav": {
+    "dashboard": "לוח בקרה",
+    "documents": "מסמכים",
+    "customers": "לקוחות",
+    "items": "פריטים",
+    "reports": "דוחות",
+    "settings": "הגדרות",
+    "more": "עוד"
+  },
+  "dashboard": {
+    "title": "ברוכים הבאים",
+    "subtitle": "כאן תוכלו להפיק חשבוניות, קבלות ומסמכים נוספים לעסק שלכם.",
+    "newDocument": "מסמך חדש",
+    "systemStatus": "מצב המערכת",
+    "server": "שרת",
+    "database": "מסד נתונים",
+    "version": "גרסה",
+    "ok": "תקין",
+    "degraded": "תקלה חלקית",
+    "unavailable": "לא זמין",
+    "loading": "בודק…",
+    "error": "אין חיבור לשרת"
+  },
+  "common": {
+    "comingSoon": "בקרוב"
+  }
+}

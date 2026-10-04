@@ -5,7 +5,7 @@ invoices, receipts, and related documents. It has a Hebrew (RTL) responsive UI,
 a FastAPI backend, PostgreSQL, and a built-in MCP server so AI agents can work
 with the same data under the same security rules.
 
-> Status: **approved, in progress (M0)**. Decisions are recorded in [§14](#14-decisions-log).
+> Status: **approved. M0 done; next: M1**. Decisions are recorded in [§14](#14-decisions-log).
 
 ---
 
@@ -396,7 +396,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 
 | # | Milestone | Deliverables |
 |---|---|---|
-| **M0** | Foundations | Monorepo skeleton, docker-compose (Postgres, Redis, Keycloak), FastAPI + React "hello", CI (lint, types, tests), pre-commit, Alembic baseline, empty MCP server mounted at `/mcp` |
+| **M0** ✅ | Foundations | Monorepo skeleton, docker-compose (Postgres, Redis, Keycloak), FastAPI + React "hello", CI (lint, types, tests), pre-commit, Alembic baseline, empty MCP server mounted at `/mcp` |
 | **M1** | Auth and tenancy | Azure `dev` environment (Terraform + auto-deploy), Keycloak realm, BFF login/logout, JWT validation for MCP, Principal, businesses, members, invitations, roles, RLS policies, audit log, Hebrew RTL app shell |
 | **M2** | Catalog | Customers and items: CRUD, search, UI, MCP tools |
 | **M3** | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
