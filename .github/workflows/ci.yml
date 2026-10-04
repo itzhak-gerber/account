@@ -28,9 +28,16 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U invoice" --health-interval 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 3s --health-retries 20
     env:
       APP_ENVIRONMENT: test
-      APP_DATABASE_URL: postgresql+asyncpg://invoice:invoice@localhost:5432/invoice
+      # Tests connect as the restricted app role so row-level security is exercised.
+      APP_DATABASE_URL: postgresql+asyncpg://invoice_app:invoice_app@localhost:5432/invoice
+      APP_TEST_ADMIN_DATABASE_URL: postgresql+asyncpg://invoice:invoice@localhost:5432/invoice
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
@@ -41,7 +48,21 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy app tests
-      - run: uv run alembic upgrade head
+      - name: Create the app database role
+        run: psql -v ON_ERROR_STOP=1 -c "CREATE ROLE invoice_app LOGIN PASSWORD 'invoice_app'"
+        env:
+          PGHOST: localhost
+          PGUSER: invoice
+          PGPASSWORD: invoice
+          PGDATABASE: invoice
+      - name: Migrate (as schema owner), then check downgrade and models are in sync
+        env:
+          APP_DATABASE_URL: postgresql+asyncpg://invoice:invoice@localhost:5432/invoice
+        run: |
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+          uv run alembic check
       - run: uv run pytest -q
 
   frontend:
@@ -62,6 +83,13 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  keycloak-realm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Realm file is valid JSON
+        run: python3 -m json.tool infra/keycloak/realm-invoice.dev.json > /dev/null
 
   docker:
     runs-on: ubuntu-latest

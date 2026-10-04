@@ -1,8 +1,21 @@
 # Local development stack: docker compose up --build
-# App:       http://localhost:5173
+# App:       http://localhost:5173   (dev users: owner@example.com / member@example.com, password Dev-Password-123)
 # API docs:  http://localhost:8000/api/docs
 # MCP:       http://localhost:8000/mcp/
-# Keycloak:  http://localhost:8080 (admin / admin)
+# Keycloak:  http://localhost:8080   (admin console: admin / admin)
+# Mailpit:   http://localhost:8025   (catches all emails sent in development)
+
+x-backend-env: &backend-env
+  APP_ENVIRONMENT: local
+  # The app connects as a restricted role so PostgreSQL row-level security applies to it.
+  APP_DATABASE_URL: postgresql+asyncpg://invoice_app:${APP_DB_PASSWORD:-invoice_app}@postgres:5432/invoice
+  APP_REDIS_URL: redis://redis:6379/0
+  APP_PUBLIC_URL: http://localhost:5173
+  APP_OIDC_ISSUER: http://localhost:8080/realms/invoice
+  APP_OIDC_INTERNAL_URL: http://keycloak:8080/realms/invoice
+  APP_OIDC_CLIENT_SECRET: ${INVOICE_WEB_CLIENT_SECRET:-dev-only-web-secret}
+  APP_SMTP_HOST: mailpit
+  APP_SMTP_PORT: "1025"
 
 services:
   postgres:
@@ -11,8 +24,11 @@ services:
       POSTGRES_USER: invoice
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-invoice}
       POSTGRES_DB: invoice
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-invoice_app}
     ports: ["5432:5432"]
-    volumes: [postgres-data:/var/lib/postgresql/data]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-app-role.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U invoice -d invoice"]
       interval: 3s
@@ -26,21 +42,38 @@ services:
       interval: 3s
       retries: 20
 
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["8025:8025", "1025:1025"]
+
   keycloak:
     image: keycloak/keycloak:26.4
-    command: ["start-dev"]
+    command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Browsers use localhost:8080; the backend reaches Keycloak as keycloak:8080.
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      INVOICE_WEB_CLIENT_SECRET: ${INVOICE_WEB_CLIENT_SECRET:-dev-only-web-secret}
     ports: ["8080:8080"]
+    volumes:
+      - ./infra/keycloak/realm-invoice.dev.json:/opt/keycloak/data/import/realm-invoice.json:ro
+      - ./infra/keycloak/themes/invoice:/opt/keycloak/themes/invoice:ro
+    depends_on: [mailpit]
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      retries: 40
 
   migrate:
     build: ./backend
     command: ["alembic", "upgrade", "head"]
-    environment: &backend-env
-      APP_ENVIRONMENT: local
+    environment:
+      <<: *backend-env
+      # Migrations run as the schema owner; the app itself never does.
       APP_DATABASE_URL: postgresql+asyncpg://invoice:${POSTGRES_PASSWORD:-invoice}@postgres:5432/invoice
-      APP_REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -51,6 +84,7 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
 
   worker:
     build: ./backend

@@ -13,7 +13,9 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": backendUrl,
+      "/auth": backendUrl,
       "/mcp": backendUrl,
+      "/.well-known/oauth-protected-resource": backendUrl,
     },
   },
   test: {

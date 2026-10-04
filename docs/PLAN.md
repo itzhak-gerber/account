@@ -5,7 +5,7 @@ invoices, receipts, and related documents. It has a Hebrew (RTL) responsive UI,
 a FastAPI backend, PostgreSQL, and a built-in MCP server so AI agents can work
 with the same data under the same security rules.
 
-> Status: **approved. M0 done; next: M1**. Decisions are recorded in [§14](#14-decisions-log).
+> Status: **approved. M0 and M1a done; next: M2 (M1b, the Azure dev environment, waits for a subscription)**. Decisions are recorded in [§14](#14-decisions-log).
 
 ---
 
@@ -264,6 +264,11 @@ service layer as REST.
 **Resources:** `business://{id}/profile`, `document://{id}`, `customer://{id}`.
 **Prompts:** "create invoice from description" and "monthly summary".
 
+**M1a status:** `/mcp` requires a Keycloak bearer token (audience `invoice-api`); tools
+`whoami`, `list_businesses`, `get_business`, `list_members` are live. Member management stays
+web-only on purpose. Fine-grained OAuth scopes (above) and dynamic client registration for
+third-party MCP clients are configured in Keycloak together with the first write tools (M2).
+
 Safety: tools never issue documents implicitly. Every MCP action is audited with
 `actor_channel = 'mcp'`. MCP tokens can be revoked per client in Keycloak.
 
@@ -397,7 +402,8 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | # | Milestone | Deliverables |
 |---|---|---|
 | **M0** ✅ | Foundations | Monorepo skeleton, docker-compose (Postgres, Redis, Keycloak), FastAPI + React "hello", CI (lint, types, tests), pre-commit, Alembic baseline, empty MCP server mounted at `/mcp` |
-| **M1** | Auth and tenancy | Azure `dev` environment (Terraform + auto-deploy), Keycloak realm, BFF login/logout, JWT validation for MCP, Principal, businesses, members, invitations, roles, RLS policies, audit log, Hebrew RTL app shell |
+| **M1a** ✅ | Auth and tenancy | Keycloak realm, BFF login/logout, JWT validation for MCP, Principal, businesses, members, invitations, roles, RLS policies, audit log, Hebrew RTL app shell |
+| **M1b** | Azure dev environment | Terraform for Azure (Container Apps, PostgreSQL Flexible Server, Key Vault, Static Web Apps), GitHub Actions deploy with OIDC federation, production Keycloak realm (no dev users / password-grant client), budget alert |
 | **M2** | Catalog | Customers and items: CRUD, search, UI, MCP tools |
 | **M3** | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
 | **M4** | Payments and delivery | Receipts and invoice-receipts, payment methods, payment status, email sending, signed PDF links |

@@ -1,3 +1,4 @@
+import AccountCircleOutlined from "@mui/icons-material/AccountCircleOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import AppBar from "@mui/material/AppBar";
@@ -10,7 +11,11 @@ import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Divider from "@mui/material/Divider";
 import Paper from "@mui/material/Paper";
+import TextField from "@mui/material/TextField";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -19,6 +24,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
+import { useSession } from "../auth/context";
+import { MfaRequiredPage } from "../pages/MfaRequiredPage";
 import { NAV_ITEMS } from "./navigation";
 
 const DRAWER_WIDTH = 240;
@@ -30,6 +37,11 @@ export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { me, current, selectBusiness, logout } = useSession();
+  const [userMenu, setUserMenu] = useState<HTMLElement | null>(null);
+  // Owners and admins must sign in with two-factor authentication before using the business.
+  const mfaWall =
+    current !== null && (current.role === "owner" || current.role === "admin") && !me.mfa;
 
   const go = (path: string) => {
     setMobileMenuOpen(false);
@@ -79,6 +91,61 @@ export function AppShell() {
           <Typography variant="h6" component="div" sx={{ fontWeight: 700, color: "primary.main" }}>
             {t("app.name")}
           </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          {me.memberships.length > 1 && current && (
+            <TextField
+              select
+              size="small"
+              label={t("app.business")}
+              value={current.business.id}
+              onChange={(e) => selectBusiness(e.target.value)}
+              sx={{ minWidth: { xs: 120, sm: 200 }, maxWidth: 260, me: 1 }}
+            >
+              {me.memberships.map((m) => (
+                <MenuItem key={m.business.id} value={m.business.id}>
+                  {m.business.display_name}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+          {me.memberships.length === 1 && current && (
+            <Typography
+              noWrap
+              sx={{ display: { xs: "none", sm: "block" }, me: 1, color: "text.secondary" }}
+            >
+              {current.business.display_name}
+            </Typography>
+          )}
+          <IconButton
+            aria-label={t("app.userMenu")}
+            onClick={(e) => setUserMenu(e.currentTarget)}
+            edge="end"
+          >
+            <AccountCircleOutlined />
+          </IconButton>
+          <Menu anchorEl={userMenu} open={userMenu !== null} onClose={() => setUserMenu(null)}>
+            <Box sx={{ px: 2, py: 1 }}>
+              <Typography sx={{ fontWeight: 500 }}>{me.user.full_name}</Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                dir="ltr"
+                sx={{ textAlign: "right" }}
+              >
+                {me.user.email}
+              </Typography>
+            </Box>
+            <Divider />
+            <MenuItem
+              onClick={() => {
+                setUserMenu(null);
+                go("/profile");
+              }}
+            >
+              {t("nav.profile")}
+            </MenuItem>
+            <MenuItem onClick={() => void logout()}>{t("nav.logout")}</MenuItem>
+          </Menu>
         </Toolbar>
       </AppBar>
 
@@ -112,7 +179,7 @@ export function AppShell() {
         sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}
       >
         <Toolbar />
-        <Outlet />
+        {mfaWall && location.pathname !== "/profile" ? <MfaRequiredPage /> : <Outlet />}
       </Box>
 
       {!isDesktop && (

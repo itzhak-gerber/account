@@ -1,12 +1,68 @@
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { Route, Routes } from "react-router";
+import { Navigate, Route, Routes, useLocation } from "react-router";
 
+import { useMeQuery } from "../auth/useMe";
+import { SessionProvider } from "../auth/session";
 import { DashboardPage } from "../pages/DashboardPage";
+import { InvitePage } from "../pages/InvitePage";
+import { LandingPage } from "../pages/LandingPage";
+import { OnboardingPage } from "../pages/OnboardingPage";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
+import { ProfilePage } from "../pages/ProfilePage";
+import { SettingsPage } from "../pages/SettingsPage";
 import { RtlThemeProvider } from "../theme/RtlThemeProvider";
 import { AppShell } from "./AppShell";
 import { NAV_ITEMS } from "./navigation";
+
+function AuthenticatedRoutes() {
+  const { data: me, isPending } = useMeQuery();
+  const location = useLocation();
+
+  if (isPending) {
+    return (
+      <Box sx={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+  if (!me) return <LandingPage />;
+
+  const hasBusiness = me.memberships.length > 0;
+  const placeholders = NAV_ITEMS.filter((item) => !["/", "/settings"].includes(item.path));
+
+  return (
+    <SessionProvider me={me}>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/invite" element={<InvitePage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          {hasBusiness ? (
+            <>
+              <Route index element={<DashboardPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              {placeholders.map((item) => (
+                <Route
+                  key={item.path}
+                  path={item.path}
+                  element={<PlaceholderPage titleKey={item.labelKey} />}
+                />
+              ))}
+            </>
+          ) : (
+            <Route index element={<OnboardingPage />} />
+          )}
+          <Route
+            path="*"
+            element={<Navigate to="/" replace state={{ from: location.pathname }} />}
+          />
+        </Route>
+      </Routes>
+    </SessionProvider>
+  );
+}
 
 export function App() {
   const [queryClient] = useState(
@@ -16,18 +72,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <RtlThemeProvider>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route index element={<DashboardPage />} />
-            {NAV_ITEMS.filter((item) => item.path !== "/").map((item) => (
-              <Route
-                key={item.path}
-                path={item.path}
-                element={<PlaceholderPage titleKey={item.labelKey} />}
-              />
-            ))}
-          </Route>
-        </Routes>
+        <AuthenticatedRoutes />
       </RtlThemeProvider>
     </QueryClientProvider>
   );

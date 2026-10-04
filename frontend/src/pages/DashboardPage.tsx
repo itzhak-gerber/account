@@ -10,6 +10,7 @@ import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 
 import { useSystemStatus } from "../api/system";
+import { useSession } from "../auth/context";
 
 function StatusRow({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
@@ -27,6 +28,7 @@ function StatusRow({ label, value, ok }: { label: string; value: string; ok?: bo
 export function DashboardPage() {
   const { t } = useTranslation();
   const { data, isPending, isError } = useSystemStatus();
+  const { current } = useSession();
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 960 }}>
@@ -39,6 +41,12 @@ export function DashboardPage() {
           <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
             {t("dashboard.title")}
           </Typography>
+          {current && (
+            <Typography variant="h6" component="p" color="primary">
+              {current.business.display_name} · {t("dashboard.yourRole")}:{" "}
+              {t(`roles.${current.role}`)}
+            </Typography>
+          )}
           <Typography color="text.secondary">{t("dashboard.subtitle")}</Typography>
         </Box>
         <Tooltip title={t("common.comingSoon")}>

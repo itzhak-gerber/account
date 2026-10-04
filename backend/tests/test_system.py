@@ -6,9 +6,8 @@ async def test_health_reports_database_ok() -> None:
         response = await client.get("/api/v1/health")
 
         assert response.status_code == 200
-        body = response.json()
-        assert body["status"] == "ok"
-        assert body["database"] == "ok"
+        assert response.json()["status"] == "ok"
+        assert response.json()["database"] == "ok"
 
 
 async def test_security_headers_present() -> None:

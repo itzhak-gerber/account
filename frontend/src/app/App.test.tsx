@@ -1,8 +1,55 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { Me, Member } from "../api/types";
 import { App } from "./App";
+
+const BUSINESS = {
+  id: "b1",
+  legal_name: "דוגמה בע״מ",
+  display_name: "דוגמה",
+  tax_id: "516179157",
+  business_type: "company" as const,
+  address_street: "",
+  address_city: "תל אביב",
+  address_zip: "",
+  phone: "",
+  email: "",
+  default_currency: "ILS",
+};
+
+function me(overrides: Partial<Me> = {}): Me {
+  return {
+    user: { id: "u1", email: "owner@example.com", full_name: "ישראל ישראלי" },
+    memberships: [{ business: BUSINESS, role: "owner" }],
+    mfa: true,
+    csrf_token: "csrf",
+    ...overrides,
+  };
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function mockApi(routes: Record<string, (method: string) => Response>) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const match = Object.keys(routes).find((path) => url.startsWith(path));
+    return match
+      ? routes[match](init?.method ?? "GET")
+      : json({ error: { code: "not_found" } }, 404);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+const HEALTH = () => json({ status: "ok", version: "0.1.0", environment: "test", database: "ok" });
 
 function renderAt(path: string) {
   return render(
@@ -12,37 +59,109 @@ function renderAt(path: string) {
   );
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.localStorage.clear();
+});
+
 describe("App", () => {
-  beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({ status: "ok", version: "0.1.0", environment: "test", database: "ok" }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-        ),
-    );
-  });
+  it("shows the landing page with login and sign-up when signed out", async () => {
+    mockApi({ "/api/v1/me": () => json({ error: { code: "not_authenticated" } }, 401) });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("renders the Hebrew dashboard with system status", async () => {
     renderAt("/");
 
-    expect(screen.getByRole("heading", { name: "ברוכים הבאים" })).toBeInTheDocument();
-    expect(await screen.findByText("0.1.0")).toBeInTheDocument();
-    expect(screen.getAllByText("תקין")).toHaveLength(2);
+    expect(await screen.findByRole("button", { name: "התחברות" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "הרשמה" })).toBeInTheDocument();
   });
 
-  it("shows a placeholder page for upcoming sections", () => {
-    renderAt("/customers");
+  it("asks for two-factor setup before creating a first business", async () => {
+    mockApi({ "/api/v1/me": () => json(me({ memberships: [], mfa: false })) });
 
-    expect(screen.getByRole("heading", { name: "לקוחות" })).toBeInTheDocument();
-    expect(screen.getByText("בקרוב")).toBeInTheDocument();
+    renderAt("/");
+
+    expect(await screen.findByRole("heading", { name: "נדרש אימות דו-שלבי" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "הפעלת אימות דו-שלבי" })).toBeInTheDocument();
+  });
+
+  it("shows the business creation form once two-factor is on", async () => {
+    mockApi({ "/api/v1/me": () => json(me({ memberships: [] })) });
+
+    renderAt("/");
+
+    expect(await screen.findByRole("heading", { name: "יצירת העסק שלכם" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/מספר עוסק/)).toBeInTheDocument();
+  });
+
+  it("validates the tax ID check digit before submitting", async () => {
+    const fetchMock = mockApi({ "/api/v1/me": () => json(me({ memberships: [] })) });
+    renderAt("/");
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText(/שם העסק/), "עסק");
+    await user.type(screen.getByLabelText(/מספר עוסק/), "123456789");
+    await user.click(screen.getByRole("button", { name: "יצירת העסק" }));
+
+    expect(screen.getByText("מספר לא תקין (נבדקת ספרת ביקורת)")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
+  it("renders the dashboard for the current business", async () => {
+    mockApi({ "/api/v1/me": () => json(me()), "/api/v1/health": HEALTH });
+
+    renderAt("/");
+
+    expect(await screen.findByText(/דוגמה · התפקיד שלך: בעלים/)).toBeInTheDocument();
+    expect(await screen.findByText("0.1.0")).toBeInTheDocument();
+  });
+
+  it("blocks owners who signed in without two-factor", async () => {
+    mockApi({ "/api/v1/me": () => json(me({ mfa: false })), "/api/v1/health": HEALTH });
+
+    renderAt("/");
+
+    expect(await screen.findByRole("heading", { name: "נדרש אימות דו-שלבי" })).toBeInTheDocument();
+    expect(screen.queryByText(/התפקיד שלך/)).not.toBeInTheDocument();
+  });
+
+  it("lists team members in settings and sends CSRF on invites", async () => {
+    const members: Member[] = [
+      {
+        id: "m1",
+        user_id: "u1",
+        email: "owner@example.com",
+        full_name: "ישראל ישראלי",
+        role: "owner",
+        joined_at: "2026-10-04T00:00:00Z",
+      },
+    ];
+    const fetchMock = mockApi({
+      "/api/v1/me": () => json(me()),
+      "/api/v1/businesses/b1/members": () => json(members),
+      "/api/v1/businesses/b1/invitations": (method) =>
+        method === "POST"
+          ? json({
+              id: "i1",
+              email: "dana@example.com",
+              role: "member",
+              expires_at: "",
+              created_at: "",
+            })
+          : json([]),
+    });
+    renderAt("/settings");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("tab", { name: "משתמשים" }));
+    const list = await screen.findByText(/ישראל ישראלי \(את\/ה\)/);
+    expect(within(list.closest("li")!).getByText("owner@example.com")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/^דוא״ל/), "dana@example.com");
+    await user.click(screen.getByRole("button", { name: "שליחת הזמנה" }));
+
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(post).toBeDefined();
+    const [url, init] = post!;
+    expect(url).toBe("/api/v1/businesses/b1/invitations");
+    expect((init!.headers as Record<string, string>)["X-CSRF-Token"]).toBe("csrf");
   });
 });

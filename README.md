@@ -20,8 +20,36 @@ docker compose up --build
 |---|---|
 | App | http://localhost:5173 |
 | API docs | http://localhost:8000/api/docs |
-| MCP endpoint | http://localhost:8000/mcp/ |
-| Keycloak admin | http://localhost:8080 (admin / admin) |
+| MCP endpoint | http://localhost:5173/mcp/ (OAuth bearer token from Keycloak) |
+| Keycloak (login server) admin | http://localhost:8080 (admin / admin) |
+| Mailpit (catches all emails sent locally) | http://localhost:8025 |
+
+### Development users
+
+The local Keycloak realm (`infra/keycloak/realm-invoice.dev.json`, **development only**) comes
+with two users, password `Dev-Password-123`:
+
+| Email | Notes |
+|---|---|
+| `owner@example.com` | Use to create a business. You will be asked to set up two-factor authentication (any authenticator app works, e.g. Google Authenticator). |
+| `member@example.com` | Use to accept an invitation. Invitation emails appear in Mailpit. |
+
+You can also register new users from the login page; the verification email arrives in Mailpit.
+
+### Connecting an AI assistant (MCP)
+
+The MCP endpoint is protected with OAuth 2.1. Clients discover the login server from
+`/.well-known/oauth-protected-resource/mcp`. For local testing, the dev-only client
+`invoice-dev-cli` can issue a token with a password grant:
+
+```bash
+curl -s http://localhost:8080/realms/invoice/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=invoice-dev-cli \
+  -d username=member@example.com -d password=Dev-Password-123 | jq -r .access_token
+```
+
+Owners and admins must use two-factor authentication, so their tokens must come from a login
+that included the one-time code.
 
 To open the app from your phone, connect it to the same Wi-Fi and browse to
 `http://<your-computer's-IP>:5173`.
@@ -30,15 +58,17 @@ Stop with `Ctrl+C`; `docker compose down -v` also deletes the local database.
 
 ## Develop without Docker
 
-Requires Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 22, and a running
-PostgreSQL 16 and Redis (e.g. `docker compose up postgres redis keycloak`).
+Requires Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 22, and the infrastructure
+services from Docker: `docker compose up postgres redis keycloak mailpit`.
 
 ```bash
 # backend
 cd backend
 uv sync
-uv run alembic upgrade head
+# migrations run as the schema owner; the app itself connects as the restricted invoice_app role
+APP_DATABASE_URL=postgresql+asyncpg://invoice:invoice@localhost:5432/invoice uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000
+uv run arq app.jobs.worker.WorkerSettings   # background jobs (emails), in another terminal
 
 # frontend (another terminal)
 cd frontend
@@ -49,7 +79,7 @@ npm run dev
 ## Checks
 
 ```bash
-cd backend && uv run ruff check . && uv run mypy app tests && uv run pytest
+cd backend && uv run ruff check . && uv run mypy app tests && uv run pytest   # needs postgres + redis
 cd frontend && npm run lint && npm run typecheck && npm test
 ```
 
@@ -60,8 +90,20 @@ CI runs all of these plus Docker image builds on every push.
 ```
 backend/    FastAPI app: REST API (/api/v1), MCP server (/mcp), worker, migrations
 frontend/   React + TypeScript + MUI, Hebrew RTL
+infra/      Keycloak realm + Hebrew login theme, Postgres init
 docs/       Plan and design documents
 ```
+
+Security model in short:
+
+- **Login**: Keycloak (OpenID Connect). The browser never sees tokens; the backend keeps them
+  in Redis and gives the browser an httpOnly session cookie, with a CSRF token for writes.
+- **Two-factor authentication** is required for business owners and admins (checked on every
+  request, for the web app and MCP alike).
+- **Tenant isolation**: every business-owned row has `business_id`, and PostgreSQL row-level
+  security policies enforce it for the app's database role, even if a query forgets a filter.
+- **Audit log**: every change is recorded with who, when, from where and via which channel; the
+  table is append-only at the database level.
 
 Business logic lives in `backend/app/services/`. REST routers (`app/api/`) and MCP tools
 (`app/mcp/`) are thin adapters over it, so every feature is available to both.

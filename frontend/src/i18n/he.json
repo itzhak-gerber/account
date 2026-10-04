@@ -1,7 +1,9 @@
 {
   "app": {
     "name": "חשבוניות",
-    "openMenu": "פתיחת תפריט"
+    "openMenu": "פתיחת תפריט",
+    "userMenu": "תפריט משתמש",
+    "business": "עסק"
   },
   "nav": {
     "dashboard": "לוח בקרה",
@@ -10,7 +12,16 @@
     "items": "פריטים",
     "reports": "דוחות",
     "settings": "הגדרות",
-    "more": "עוד"
+    "more": "עוד",
+    "profile": "פרופיל ואבטחה",
+    "logout": "התנתקות"
+  },
+  "landing": {
+    "title": "הפקת חשבוניות וקבלות לעסק שלכם",
+    "subtitle": "חשבוניות מס, קבלות, הצעות מחיר וזיכויים, במקום אחד ומכל מכשיר.",
+    "login": "התחברות",
+    "register": "הרשמה",
+    "secure": "מאובטח באימות דו-שלבי"
   },
   "dashboard": {
     "title": "ברוכים הבאים",
@@ -24,9 +35,141 @@
     "degraded": "תקלה חלקית",
     "unavailable": "לא זמין",
     "loading": "בודק…",
-    "error": "אין חיבור לשרת"
+    "error": "אין חיבור לשרת",
+    "yourRole": "התפקיד שלך"
+  },
+  "onboarding": {
+    "title": "יצירת העסק שלכם",
+    "subtitle": "כמה פרטים בסיסיים, ואפשר להתחיל.",
+    "create": "יצירת העסק",
+    "pendingInvite": "קיבלתם הזמנה לעסק קיים? פתחו את הקישור מהמייל."
+  },
+  "mfa": {
+    "title": "נדרש אימות דו-שלבי",
+    "explainOwner": "כדי לנהל עסק במערכת יש להפעיל אימות דו-שלבי. כך גם אם מישהו ישיג את הסיסמה שלכם, הוא לא יוכל להיכנס לחשבון.",
+    "steps": "תצטרכו אפליקציית אימות בטלפון (למשל Google Authenticator או Microsoft Authenticator). ההגדרה לוקחת כדקה.",
+    "setup": "הפעלת אימות דו-שלבי",
+    "signInAgain": "כבר הפעלתי, התחברות מחדש",
+    "enabled": "אימות דו-שלבי פעיל",
+    "notEnabled": "אימות דו-שלבי לא פעיל"
+  },
+  "business": {
+    "legal_name": "שם העסק (כפי שרשום ברשויות)",
+    "display_name": "שם לתצוגה",
+    "tax_id": "מספר עוסק / ח.פ",
+    "business_type": "סוג העסק",
+    "address_street": "רחוב ומספר",
+    "address_city": "עיר",
+    "address_zip": "מיקוד",
+    "phone": "טלפון",
+    "email": "דוא״ל לעסק",
+    "save": "שמירה",
+    "saved": "הפרטים נשמרו",
+    "readOnly": "אין לך הרשאה לערוך את פרטי העסק",
+    "invalidTaxId": "מספר לא תקין (נבדקת ספרת ביקורת)",
+    "types": {
+      "exempt_dealer": "עוסק פטור",
+      "licensed_dealer": "עוסק מורשה",
+      "company": "חברה בע״מ",
+      "nonprofit": "עמותה / מלכ״ר"
+    }
+  },
+  "roles": {
+    "owner": "בעלים",
+    "admin": "מנהל/ת",
+    "accountant": "רואה חשבון",
+    "member": "משתמש/ת",
+    "viewer": "צפייה בלבד"
+  },
+  "roleHelp": {
+    "owner": "הכול, כולל ניהול בעלים",
+    "admin": "ניהול משתמשים והגדרות, הפקת מסמכים",
+    "accountant": "צפייה בהכול וייצוא דוחות",
+    "member": "יצירה והפקה של מסמכים",
+    "viewer": "צפייה בלבד"
+  },
+  "settings": {
+    "title": "הגדרות",
+    "tabDetails": "פרטי העסק",
+    "tabTeam": "משתמשים",
+    "tabAudit": "יומן פעולות"
+  },
+  "team": {
+    "members": "משתמשים בעסק",
+    "name": "שם",
+    "email": "דוא״ל",
+    "role": "תפקיד",
+    "you": "(את/ה)",
+    "remove": "הסרה",
+    "leave": "עזיבת העסק",
+    "confirmRemove": "להסיר את {{name}} מהעסק?",
+    "invite": "הזמנת משתמש",
+    "inviteEmail": "דוא״ל",
+    "inviteRole": "תפקיד",
+    "send": "שליחת הזמנה",
+    "sent": "ההזמנה נשלחה אל {{email}}",
+    "pending": "הזמנות ממתינות",
+    "expires": "בתוקף עד",
+    "revoke": "ביטול",
+    "noPending": "אין הזמנות ממתינות"
+  },
+  "audit": {
+    "when": "מתי",
+    "who": "מי",
+    "what": "פעולה",
+    "via": "דרך",
+    "empty": "אין פעולות להצגה",
+    "channels": { "web": "אתר", "api": "API", "mcp": "עוזר AI", "system": "מערכת" },
+    "actions": {
+      "business.created": "יצירת העסק",
+      "business.updated": "עדכון פרטי העסק",
+      "member.role_changed": "שינוי תפקיד",
+      "member.removed": "הסרת משתמש",
+      "member.left": "עזיבת העסק",
+      "invitation.created": "שליחת הזמנה",
+      "invitation.revoked": "ביטול הזמנה",
+      "invitation.accepted": "הצטרפות לעסק",
+      "user.login": "התחברות",
+      "user.logout_all": "התנתקות מכל המכשירים"
+    }
+  },
+  "profile": {
+    "title": "פרופיל ואבטחה",
+    "account": "החשבון שלי",
+    "security": "אבטחה",
+    "changePassword": "שינוי סיסמה",
+    "logoutAll": "התנתקות מכל המכשירים",
+    "logoutAllHelp": "מנתק את החשבון בכל הדפדפנים והמכשירים, כולל זה."
+  },
+  "invite": {
+    "title": "הזמנה להצטרף לעסק",
+    "body": "{{inviter}} הזמין/ה אותך להצטרף ל<b>{{business}}</b> בתפקיד <b>{{role}}</b>.",
+    "accept": "הצטרפות לעסק",
+    "wrongEmail": "ההזמנה נשלחה אל {{email}}. התחברו עם כתובת זו כדי לקבל אותה.",
+    "switchAccount": "התחברות עם חשבון אחר",
+    "statusExpired": "תוקף ההזמנה פג. בקשו הזמנה חדשה.",
+    "statusAccepted": "ההזמנה כבר נוצלה.",
+    "statusRevoked": "ההזמנה בוטלה.",
+    "notFound": "ההזמנה לא נמצאה."
+  },
+  "errors": {
+    "unknown_error": "אירעה שגיאה. נסו שוב.",
+    "validation_error": "חלק מהשדות אינם תקינים.",
+    "permission_denied": "אין לך הרשאה לפעולה זו.",
+    "last_owner": "לעסק חייב להיות לפחות בעלים אחד.",
+    "already_member": "המשתמש כבר חבר בעסק.",
+    "invitation_email_mismatch": "ההזמנה נשלחה לכתובת דוא״ל אחרת.",
+    "rate_limited": "יותר מדי בקשות. נסו שוב בעוד דקה.",
+    "csrf_failed": "פג תוקף הדף. רעננו ונסו שוב.",
+    "login_failed": "ההתחברות נכשלה. נסו שוב.",
+    "login_expired": "תם הזמן להתחברות. נסו שוב.",
+    "login_state_mismatch": "ההתחברות נכשלה. נסו שוב."
   },
   "common": {
-    "comingSoon": "בקרוב"
+    "comingSoon": "בקרוב",
+    "cancel": "ביטול",
+    "confirm": "אישור",
+    "loading": "טוען…",
+    "required": "שדה חובה"
   }
 }
