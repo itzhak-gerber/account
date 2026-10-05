@@ -12,8 +12,15 @@ COPY . .
 RUN uv sync --frozen --no-dev
 
 FROM python:3.12-slim AS runtime
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/opt/venv/bin:$PATH"
-RUN useradd --system --uid 10001 --no-create-home app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/opt/venv/bin:$PATH" \
+    APP_STORAGE_DIR=/data/files
+# Pango/HarfBuzz for WeasyPrint (Hebrew PDF text shaping). Fonts are bundled with the app.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 fontconfig \
+    && rm -rf /var/lib/apt/lists/*
+RUN useradd --system --uid 10001 --no-create-home app \
+    && mkdir -p /data/files && chown app /data/files
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv
 COPY --from=build /app /app

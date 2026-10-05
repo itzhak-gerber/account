@@ -36,6 +36,17 @@ with two users, password `Dev-Password-123`:
 
 You can also register new users from the login page; the verification email arrives in Mailpit.
 
+### What you can do today
+
+1. Sign in as `owner@example.com`, set up two-factor, and create a business (fill in the
+   address: tax documents need it).
+2. **פריטים** (Items) and **לקוחות** (Customers): add your catalog and customers.
+3. **מסמך חדש** (New document): quote, proforma, tax invoice, receipt, tax invoice-receipt.
+   Pick a customer and items, see VAT and totals live, save a draft, preview the PDF, then
+   **הפקת המסמך** (issue). Issued documents get the next number and can no longer change.
+4. From an issued quote: convert to an invoice. From an invoice: **הפקת זיכוי** (credit note).
+5. **הורדת PDF**: the first download is the original (מקור), later ones are marked as copies.
+
 ### Connecting an AI assistant (MCP)
 
 The MCP endpoint is protected with OAuth 2.1. Clients discover the login server from

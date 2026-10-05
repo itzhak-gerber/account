@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,6 +38,14 @@ class Settings(BaseSettings):
 
     invitation_ttl_days: int = 7
 
+    # Signs short-lived download links (e.g. PDFs for MCP clients). Must be set in production.
+    secret_key: str = "dev-only-secret-key-change-me"  # noqa: S105
+    # Where generated files (PDFs) are stored locally; Azure Blob Storage comes with M1b.
+    storage_dir: str = "var/files"
+    timezone: str = "Asia/Jerusalem"
+    # Israel Tax Authority allocation numbers: off until the software is registered.
+    ita_allocation_enabled: bool = False
+
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     smtp_username: str | None = None
@@ -56,6 +64,12 @@ class Settings(BaseSettings):
     mcp_allowed_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:*", "http://127.0.0.1:*"]
     )
+
+    @model_validator(mode="after")
+    def _production_secrets(self) -> "Settings":
+        if self.environment == "production" and self.secret_key.startswith("dev-only"):
+            raise ValueError("APP_SECRET_KEY must be set in production")
+        return self
 
     @property
     def is_production(self) -> bool:

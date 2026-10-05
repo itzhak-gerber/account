@@ -1,0 +1,713 @@
+"""Documents: drafts, issuing (numbering, VAT, PDF, immutability), conversions, credit notes."""
+
+import uuid
+from datetime import UTC, date, datetime
+from decimal import Decimal
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth.principal import BusinessContext
+from app.core.config import get_settings
+from app.core.errors import AppError, Conflict, Forbidden, NotFound
+from app.core.storage import get_storage
+from app.models import (
+    Business,
+    BusinessType,
+    Document,
+    DocumentLine,
+    DocumentPayment,
+    DocumentRelation,
+    DocumentStatus,
+    DocumentType,
+    OutboxEvent,
+    RelationType,
+    StoredFile,
+    VatType,
+)
+from app.pdf.render import Variant, render_pdf
+from app.schemas.documents import (
+    CustomerDetails,
+    DocumentIn,
+    DocumentOut,
+    DocumentPatch,
+    DocumentSummary,
+    LineIn,
+    LineOut,
+    PaymentIn,
+    PaymentOut,
+    RelatedDocument,
+)
+from app.services import audit, catalog, numbering, vat
+from app.services.calc import ZERO, LineInput, compute_totals, money
+from app.services.document_rules import (
+    CONVERSIONS,
+    CREDITABLE,
+    RULES,
+    allowed_types,
+    charges_vat,
+)
+from app.services.permissions import Permission, require
+
+
+class InvalidDocument(AppError):
+    status_code = 422
+    code = "invalid_document"
+
+
+def today() -> date:
+    return datetime.now(ZoneInfo(get_settings().timezone)).date()
+
+
+async def _business(session: AsyncSession, ctx: BusinessContext) -> Business:
+    business = await session.get(Business, ctx.business_id)
+    assert business is not None
+    return business
+
+
+async def _load(
+    session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID, *, lock: bool = False
+) -> Document:
+    query = select(Document).where(
+        Document.id == document_id, Document.business_id == ctx.business_id
+    )
+    if lock:
+        query = query.with_for_update()
+    document = await session.scalar(query)
+    if document is None:
+        raise NotFound("Document not found", code="document_not_found")
+    return document
+
+
+def _require_draft(document: Document) -> None:
+    if document.status != DocumentStatus.DRAFT:
+        raise Conflict("Issued documents cannot be changed", code="document_issued")
+
+
+def _customer_dict(details: CustomerDetails) -> dict[str, Any]:
+    data = details.model_dump()
+    data["email"] = data["email"] or ""
+    return data
+
+
+def _business_snapshot(business: Business) -> dict[str, Any]:
+    return {
+        "legal_name": business.legal_name,
+        "display_name": business.display_name,
+        "tax_id": business.tax_id,
+        "business_type": business.business_type,
+        "address_street": business.address_street,
+        "address_city": business.address_city,
+        "address_zip": business.address_zip,
+        "phone": business.phone,
+        "email": business.email,
+    }
+
+
+async def _vat_rate(session: AsyncSession, business: Business, document: Document) -> Decimal:
+    doc_type = DocumentType(document.type)
+    if doc_type == DocumentType.CREDIT_NOTE:
+        return document.vat_rate  # fixed to the credited invoice's rate
+    if not charges_vat(BusinessType(business.business_type), doc_type):
+        return ZERO
+    return await vat.rate_on(session, document.issue_date)
+
+
+async def _set_customer(
+    session: AsyncSession,
+    ctx: BusinessContext,
+    document: Document,
+    customer_id: uuid.UUID | None,
+    details: CustomerDetails | None,
+) -> None:
+    if customer_id is not None:
+        customer = await catalog.get_customer(session, ctx, customer_id)
+        document.customer_id = customer.id
+        document.customer = (
+            _customer_dict(details)
+            if details is not None
+            else {
+                "name": customer.name,
+                "tax_id": customer.tax_id,
+                "email": customer.email,
+                "phone": customer.phone,
+                "address_street": customer.address_street,
+                "address_city": customer.address_city,
+                "address_zip": customer.address_zip,
+            }
+        )
+    elif details is not None:
+        document.customer_id = None
+        document.customer = _customer_dict(details)
+
+
+async def _set_lines(
+    session: AsyncSession, ctx: BusinessContext, document: Document, lines: list[LineIn]
+) -> None:
+    rules = RULES[DocumentType(document.type)]
+    if lines and not rules.has_lines:
+        raise InvalidDocument(f"A {document.type} has no item lines", code="lines_not_allowed")
+    for line in lines:
+        if line.item_id is not None:
+            await catalog.get_item(session, ctx, line.item_id)
+    document.lines = [
+        DocumentLine(
+            business_id=ctx.business_id,
+            position=i,
+            item_id=line.item_id,
+            description=line.description,
+            quantity=line.quantity,
+            unit_of_measure=line.unit_of_measure,
+            unit_price=line.unit_price,
+            discount_percent=line.discount_percent,
+            vat_type=line.vat_type,
+            line_total=ZERO,
+        )
+        for i, line in enumerate(lines)
+    ]
+
+
+def _set_payments(ctx: BusinessContext, document: Document, payments: list[PaymentIn]) -> None:
+    if payments and not RULES[DocumentType(document.type)].has_payments:
+        raise InvalidDocument(f"A {document.type} has no payments", code="payments_not_allowed")
+    document.payments = [
+        DocumentPayment(
+            business_id=ctx.business_id,
+            position=i,
+            method=p.method,
+            amount=p.amount,
+            payment_date=p.payment_date,
+            details=p.details.model_dump(exclude_defaults=True),
+        )
+        for i, p in enumerate(payments)
+    ]
+
+
+async def _recalculate(session: AsyncSession, business: Business, document: Document) -> None:
+    rate = await _vat_rate(session, business, document)
+    document.vat_rate = rate
+    if not RULES[DocumentType(document.type)].has_lines:
+        # Receipts: the total is what was received.
+        total = money(sum((p.amount for p in document.payments), ZERO))
+        document.subtotal, document.discount_total = total, money(ZERO)
+        document.vat_amount, document.total = money(ZERO), total
+        return
+    no_vat = rate == ZERO
+    totals = compute_totals(
+        [
+            LineInput(
+                quantity=line.quantity,
+                unit_price=line.unit_price,
+                discount_percent=line.discount_percent,
+                vat_type=VatType.EXEMPT if no_vat else VatType(line.vat_type),
+            )
+            for line in document.lines
+        ],
+        vat_rate=rate,
+        prices_include_vat=document.prices_include_vat and not no_vat,
+    )
+    for line, total in zip(document.lines, totals.line_totals, strict=True):
+        line.line_total = total
+    document.subtotal = totals.subtotal
+    document.discount_total = totals.discount_total
+    document.vat_amount = totals.vat_amount
+    document.total = totals.total
+
+
+# --- reading ---------------------------------------------------------------------------
+
+
+async def related(session: AsyncSession, document: Document) -> list[RelatedDocument]:
+    rows = await session.execute(
+        select(DocumentRelation, Document)
+        .join(
+            Document,
+            or_(
+                (DocumentRelation.from_document_id == document.id)
+                & (Document.id == DocumentRelation.to_document_id),
+                (DocumentRelation.to_document_id == document.id)
+                & (Document.id == DocumentRelation.from_document_id),
+            ),
+        )
+        .order_by(DocumentRelation.created_at)
+    )
+    return [
+        RelatedDocument(
+            id=other.id,
+            type=DocumentType(other.type),
+            number=other.number,
+            status=DocumentStatus(other.status),
+            relation=RelationType(rel.relation),
+            direction="outgoing" if rel.from_document_id == document.id else "incoming",
+        )
+        for rel, other in rows.all()
+    ]
+
+
+async def to_out(session: AsyncSession, document: Document) -> DocumentOut:
+    return DocumentOut(
+        id=document.id,
+        type=DocumentType(document.type),
+        title=RULES[DocumentType(document.type)].title_he,
+        status=DocumentStatus(document.status),
+        number=document.number,
+        issue_date=document.issue_date,
+        due_date=document.due_date,
+        customer_id=document.customer_id,
+        customer=CustomerDetails.model_validate(
+            {**(document.customer or {}), "email": (document.customer or {}).get("email") or None}
+        ),
+        currency=document.currency,
+        prices_include_vat=document.prices_include_vat,
+        vat_rate=document.vat_rate,
+        subtotal=document.subtotal,
+        discount_total=document.discount_total,
+        vat_amount=document.vat_amount,
+        total=document.total,
+        notes=document.notes,
+        allocation_number=document.allocation_number,
+        lines=[LineOut.model_validate(line) for line in document.lines],
+        payments=[PaymentOut.model_validate(p) for p in document.payments],
+        related=await related(session, document),
+        original_delivered_at=document.original_delivered_at,
+        issued_at=document.issued_at,
+        created_at=document.created_at,
+    )
+
+
+async def get_document(
+    session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID
+) -> Document:
+    require(ctx.role, Permission.VIEW_DOCUMENTS)
+    return await _load(session, ctx, document_id)
+
+
+async def list_documents(
+    session: AsyncSession,
+    ctx: BusinessContext,
+    *,
+    doc_type: DocumentType | None = None,
+    status: DocumentStatus | None = None,
+    customer_id: uuid.UUID | None = None,
+    q: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[DocumentSummary]:
+    require(ctx.role, Permission.VIEW_DOCUMENTS)
+    query = select(Document).where(Document.business_id == ctx.business_id)
+    if doc_type:
+        query = query.where(Document.type == doc_type)
+    if status:
+        query = query.where(Document.status == status)
+    if customer_id:
+        query = query.where(Document.customer_id == customer_id)
+    if date_from:
+        query = query.where(Document.issue_date >= date_from)
+    if date_to:
+        query = query.where(Document.issue_date <= date_to)
+    if q:
+        text = q.strip()
+        condition = Document.customer["name"].astext.ilike(f"%{text.replace('%', '')}%")
+        if text.isdigit():
+            condition = or_(condition, Document.number == int(text))
+        query = query.where(condition)
+    query = query.order_by(Document.issue_date.desc(), Document.created_at.desc())
+    documents = await session.scalars(query.limit(min(limit, 200)).offset(offset))
+    return [
+        DocumentSummary(
+            id=d.id,
+            type=DocumentType(d.type),
+            status=DocumentStatus(d.status),
+            number=d.number,
+            issue_date=d.issue_date,
+            customer_name=(d.customer or {}).get("name", ""),
+            total=d.total,
+            created_at=d.created_at,
+        )
+        for d in documents
+    ]
+
+
+# --- drafts ----------------------------------------------------------------------------
+
+
+async def create_draft(session: AsyncSession, ctx: BusinessContext, data: DocumentIn) -> Document:
+    require(ctx.role, Permission.EDIT_DRAFTS)
+    business = await _business(session, ctx)
+    if data.type == DocumentType.CREDIT_NOTE:
+        raise InvalidDocument(
+            "Credit notes are created from the invoice they credit", code="credit_note_from_invoice"
+        )
+    if data.type not in allowed_types(BusinessType(business.business_type)):
+        raise Forbidden(
+            "This business type cannot issue this document type", code="document_type_not_allowed"
+        )
+    document = Document(
+        business_id=ctx.business_id,
+        type=data.type,
+        status=DocumentStatus.DRAFT,
+        issue_date=data.issue_date or today(),
+        due_date=data.due_date if RULES[data.type].has_due_date else None,
+        customer={},
+        currency=business.default_currency,
+        prices_include_vat=data.prices_include_vat,
+        vat_rate=ZERO,
+        notes=data.notes,
+        amount_paid=ZERO,
+        source=ctx.principal.channel,
+        created_by_user_id=ctx.principal.user_id,
+    )
+    await _set_customer(session, ctx, document, data.customer_id, data.customer)
+    await _set_lines(session, ctx, document, data.lines)
+    _set_payments(ctx, document, data.payments)
+    await _recalculate(session, business, document)
+    session.add(document)
+    await session.flush()
+    await audit.record(
+        session,
+        ctx.principal,
+        action="document.draft_created",
+        entity_type="document",
+        entity_id=document.id,
+        business_id=ctx.business_id,
+        changes={"type": data.type},
+    )
+    return document
+
+
+async def update_draft(
+    session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID, patch: DocumentPatch
+) -> Document:
+    require(ctx.role, Permission.EDIT_DRAFTS)
+    document = await _load(session, ctx, document_id, lock=True)
+    _require_draft(document)
+    business = await _business(session, ctx)
+    fields = patch.model_fields_set
+    if "issue_date" in fields and patch.issue_date is not None:
+        document.issue_date = patch.issue_date
+    if "due_date" in fields:
+        document.due_date = (
+            patch.due_date if RULES[DocumentType(document.type)].has_due_date else None
+        )
+    if "customer_id" in fields or "customer" in fields:
+        if patch.customer_id is None and patch.customer is None:
+            document.customer_id, document.customer = None, {}
+        else:
+            await _set_customer(session, ctx, document, patch.customer_id, patch.customer)
+    if patch.prices_include_vat is not None:
+        document.prices_include_vat = patch.prices_include_vat
+    if patch.lines is not None:
+        await _set_lines(session, ctx, document, patch.lines)
+    if patch.payments is not None:
+        _set_payments(ctx, document, patch.payments)
+    if patch.notes is not None:
+        document.notes = patch.notes
+    await _recalculate(session, business, document)
+    document.updated_at = datetime.now(UTC)
+    await session.flush()
+    return document
+
+
+async def delete_draft(session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID) -> None:
+    require(ctx.role, Permission.EDIT_DRAFTS)
+    document = await _load(session, ctx, document_id, lock=True)
+    _require_draft(document)
+    await session.delete(document)
+    await session.flush()
+    await audit.record(
+        session,
+        ctx.principal,
+        action="document.draft_deleted",
+        entity_type="document",
+        entity_id=document_id,
+        business_id=ctx.business_id,
+        changes={"type": document.type},
+    )
+
+
+async def _new_draft_from(
+    session: AsyncSession,
+    ctx: BusinessContext,
+    source: Document,
+    target_type: DocumentType,
+    relation: RelationType,
+) -> Document:
+    draft = Document(
+        business_id=ctx.business_id,
+        type=target_type,
+        status=DocumentStatus.DRAFT,
+        issue_date=today(),
+        customer_id=source.customer_id,
+        customer=dict(source.customer or {}),
+        currency=source.currency,
+        prices_include_vat=source.prices_include_vat,
+        vat_rate=source.vat_rate if target_type == DocumentType.CREDIT_NOTE else ZERO,
+        notes=source.notes,
+        amount_paid=ZERO,
+        source=ctx.principal.channel,
+        created_by_user_id=ctx.principal.user_id,
+        lines=[
+            DocumentLine(
+                business_id=ctx.business_id,
+                position=line.position,
+                item_id=line.item_id,
+                description=line.description,
+                quantity=line.quantity,
+                unit_of_measure=line.unit_of_measure,
+                unit_price=line.unit_price,
+                discount_percent=line.discount_percent,
+                vat_type=line.vat_type,
+                line_total=line.line_total,
+            )
+            for line in source.lines
+        ],
+        payments=[],
+    )
+    await _recalculate(session, await _business(session, ctx), draft)
+    session.add(draft)
+    await session.flush()
+    session.add(
+        DocumentRelation(
+            business_id=ctx.business_id,
+            from_document_id=draft.id,
+            to_document_id=source.id,
+            relation=relation,
+        )
+    )
+    await session.flush()
+    await audit.record(
+        session,
+        ctx.principal,
+        action="document.draft_created",
+        entity_type="document",
+        entity_id=draft.id,
+        business_id=ctx.business_id,
+        changes={"type": target_type, relation.value: str(source.id)},
+    )
+    return draft
+
+
+async def convert(
+    session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID, target: DocumentType
+) -> Document:
+    require(ctx.role, Permission.EDIT_DRAFTS)
+    source = await _load(session, ctx, document_id)
+    if source.status != DocumentStatus.ISSUED:
+        raise Conflict("Only issued documents can be converted", code="document_not_issued")
+    if target not in CONVERSIONS.get(DocumentType(source.type), frozenset()):
+        raise InvalidDocument("This conversion is not supported", code="conversion_not_allowed")
+    business = await _business(session, ctx)
+    if target not in allowed_types(BusinessType(business.business_type)):
+        raise Forbidden(
+            "This business type cannot issue this document type", code="document_type_not_allowed"
+        )
+    return await _new_draft_from(session, ctx, source, target, RelationType.CONVERTED_FROM)
+
+
+async def create_credit_note(
+    session: AsyncSession, ctx: BusinessContext, invoice_id: uuid.UUID
+) -> Document:
+    require(ctx.role, Permission.EDIT_DRAFTS)
+    invoice = await _load(session, ctx, invoice_id)
+    if invoice.status != DocumentStatus.ISSUED or invoice.type not in CREDITABLE:
+        raise InvalidDocument(
+            "Credit notes can only be created for issued tax invoices", code="not_creditable"
+        )
+    return await _new_draft_from(
+        session, ctx, invoice, DocumentType.CREDIT_NOTE, RelationType.CREDITS
+    )
+
+
+# --- issuing ---------------------------------------------------------------------------
+
+
+async def _credited_invoice(session: AsyncSession, document: Document) -> Document | None:
+    return await session.scalar(
+        select(Document)
+        .join(DocumentRelation, DocumentRelation.to_document_id == Document.id)
+        .where(
+            DocumentRelation.from_document_id == document.id,
+            DocumentRelation.relation == RelationType.CREDITS,
+        )
+    )
+
+
+async def _validate_for_issue(
+    session: AsyncSession, business: Business, document: Document
+) -> None:
+    doc_type = DocumentType(document.type)
+    rules = RULES[doc_type]
+    if doc_type not in allowed_types(BusinessType(business.business_type)):
+        raise Forbidden(
+            "This business type cannot issue this document type", code="document_type_not_allowed"
+        )
+    if rules.is_tax_document and not (business.address_street and business.address_city):
+        raise InvalidDocument(
+            "The business address must be filled in before issuing tax documents",
+            code="business_address_required",
+        )
+    if not (document.customer or {}).get("name"):
+        raise InvalidDocument("Customer name is required", code="customer_name_required")
+    if rules.has_lines and not document.lines:
+        raise InvalidDocument("At least one line is required", code="lines_required")
+    if rules.has_payments and not document.payments:
+        raise InvalidDocument("At least one payment is required", code="payments_required")
+    if document.total <= ZERO:
+        raise InvalidDocument("The total must be positive", code="total_not_positive")
+    if rules.payments_equal_total:
+        paid = sum((p.amount for p in document.payments), ZERO)
+        if paid != document.total:
+            raise InvalidDocument(
+                f"Payments ({paid}) must equal the total ({document.total})",
+                code="payments_mismatch",
+            )
+    if document.issue_date > today():
+        raise InvalidDocument("The date cannot be in the future", code="issue_date_in_future")
+    last_date = await session.scalar(
+        select(func.max(Document.issue_date)).where(
+            Document.business_id == business.id,
+            Document.type == doc_type,
+            Document.status == DocumentStatus.ISSUED,
+        )
+    )
+    if last_date and document.issue_date < last_date:
+        # Numbers follow dates: a document cannot be dated before the last one of its type.
+        raise InvalidDocument(
+            f"The date cannot be earlier than the last issued document ({last_date})",
+            code="issue_date_before_last",
+            last_issue_date=last_date.isoformat(),
+        )
+    if doc_type == DocumentType.CREDIT_NOTE:
+        invoice = await _credited_invoice(session, document)
+        if invoice is None:
+            raise InvalidDocument("Credit note has no invoice", code="credit_note_from_invoice")
+        already = await session.scalar(
+            select(func.coalesce(func.sum(Document.total), 0))
+            .join(DocumentRelation, DocumentRelation.from_document_id == Document.id)
+            .where(
+                DocumentRelation.to_document_id == invoice.id,
+                DocumentRelation.relation == RelationType.CREDITS,
+                Document.status == DocumentStatus.ISSUED,
+            )
+        )
+        if document.total > invoice.total - Decimal(already or 0):
+            raise InvalidDocument(
+                "The credit exceeds what is left to credit on the invoice",
+                code="credit_exceeds_invoice",
+                remaining=str(invoice.total - Decimal(already or 0)),
+            )
+
+
+async def references_for(session: AsyncSession, document: Document) -> list[str]:
+    lines = []
+    for rel in await related(session, document):
+        if rel.direction != "outgoing" or rel.number is None:
+            continue
+        title = RULES[rel.type].title_he
+        if rel.relation == RelationType.CREDITS:
+            lines.append(f"זיכוי עבור {title} מס׳ {rel.number}")
+        elif rel.relation == RelationType.CONVERTED_FROM:
+            lines.append(f"בהמשך ל{title} מס׳ {rel.number}")
+    return lines
+
+
+async def issue(session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID) -> Document:
+    """Assign the next number, freeze the document, store the original PDF. Irreversible."""
+    require(ctx.role, Permission.ISSUE_DOCUMENTS)
+    document = await _load(session, ctx, document_id, lock=True)
+    _require_draft(document)
+    business = await _business(session, ctx)
+    await _recalculate(session, business, document)  # VAT rate for the final issue date
+    await _validate_for_issue(session, business, document)
+
+    document.number = await numbering.next_number(
+        session, ctx.business_id, DocumentType(document.type)
+    )
+    document.status = DocumentStatus.ISSUED
+    document.business_snapshot = _business_snapshot(business)
+    document.issued_at = datetime.now(UTC)
+    document.issued_by_user_id = ctx.principal.user_id
+
+    pdf = await render_pdf(
+        document, document.business_snapshot, "original", await references_for(session, document)
+    )
+    stored = await get_storage().put(f"{ctx.business_id}/documents/{document.id}/original.pdf", pdf)
+    file = StoredFile(
+        business_id=ctx.business_id,
+        storage_key=stored.key,
+        content_type="application/pdf",
+        size=stored.size,
+        sha256=stored.sha256,
+    )
+    session.add(file)
+    await session.flush()
+    document.original_pdf_file_id = file.id
+    session.add(
+        OutboxEvent(
+            business_id=ctx.business_id,
+            event_type="document.issued",
+            payload={
+                "document_id": str(document.id),
+                "type": document.type,
+                "number": document.number,
+                "total": str(document.total),
+                "customer_id": str(document.customer_id) if document.customer_id else None,
+            },
+        )
+    )
+    await session.flush()
+    await audit.record(
+        session,
+        ctx.principal,
+        action="document.issued",
+        entity_type="document",
+        entity_id=document.id,
+        business_id=ctx.business_id,
+        changes={"type": document.type, "number": document.number, "total": str(document.total)},
+    )
+    return document
+
+
+# --- PDF -------------------------------------------------------------------------------
+
+
+async def pdf(
+    session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID
+) -> tuple[bytes, str, Variant]:
+    """Drafts: preview. Issued: the stored original the first time, then marked copies."""
+    require(ctx.role, Permission.VIEW_DOCUMENTS)
+    document = await _load(session, ctx, document_id, lock=True)
+    name = f"{document.type}-{document.number or 'draft'}.pdf"
+    if document.status == DocumentStatus.DRAFT:
+        business = await _business(session, ctx)
+        content = await render_pdf(
+            document,
+            _business_snapshot(business),
+            "draft",
+            await references_for(session, document),
+        )
+        return content, name, "draft"
+    if document.original_delivered_at is None and document.original_pdf_file_id:
+        file = await session.get(StoredFile, document.original_pdf_file_id)
+        assert file is not None
+        content = await get_storage().get(file.storage_key)
+        document.original_delivered_at = datetime.now(UTC)
+        await session.flush()
+        await audit.record(
+            session,
+            ctx.principal,
+            action="document.original_delivered",
+            entity_type="document",
+            entity_id=document.id,
+            business_id=ctx.business_id,
+        )
+        return content, name, "original"
+    assert document.business_snapshot is not None
+    content = await render_pdf(
+        document, document.business_snapshot, "copy", await references_for(session, document)
+    )
+    return content, name, "copy"

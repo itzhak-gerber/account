@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>{{ title }} {{ doc.number or "" }}</title>
+<style>
+  @font-face { font-family: Heebo; src: url("{{ fonts }}/Heebo_400Regular.ttf"); font-weight: 400; }
+  @font-face { font-family: Heebo; src: url("{{ fonts }}/Heebo_700Bold.ttf"); font-weight: 700; }
+  @page {
+    size: A4;
+    margin: 18mm 16mm 22mm 16mm;
+    @bottom-center {
+      content: "{{ footer }} · עמוד " counter(page) " מתוך " counter(pages);
+      font-family: Heebo; font-size: 8pt; color: #6b7280;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Heebo, sans-serif; font-size: 10pt; color: #111827; margin: 0; }
+  .ltr { direction: ltr; unicode-bidi: embed; }
+  header { display: flex; justify-content: space-between; align-items: flex-start;
+           border-bottom: 2px solid #1e4fd8; padding-bottom: 8mm; margin-bottom: 6mm; }
+  .business h1 { font-size: 16pt; margin: 0 0 2mm; color: #1e4fd8; }
+  .business div { color: #374151; line-height: 1.5; }
+  .doc-title { text-align: left; }
+  .doc-title h2 { font-size: 18pt; margin: 0; }
+  .doc-title .number { font-size: 13pt; font-weight: 700; }
+  .mark { display: inline-block; margin-top: 2mm; padding: 1mm 4mm; border: 1.5px solid #111827;
+          border-radius: 2mm; font-weight: 700; font-size: 11pt; }
+  .mark.draft { border-color: #b91c1c; color: #b91c1c; }
+  .meta { display: flex; justify-content: space-between; gap: 8mm; margin-bottom: 6mm; }
+  .box { flex: 1; background: #f5f7fb; border-radius: 2mm; padding: 4mm; line-height: 1.6; }
+  .box .label { color: #6b7280; font-size: 8.5pt; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 5mm; }
+  th { background: #1e4fd8; color: #fff; font-weight: 700; padding: 2mm; text-align: right; }
+  td { padding: 2mm; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  td.num, th.num { text-align: left; white-space: nowrap; }
+  .totals { width: 45%; margin-right: auto; margin-left: 0; }
+  .totals td { border: none; padding: 1.2mm 2mm; }
+  .totals tr.grand td { border-top: 2px solid #111827; font-weight: 700; font-size: 12pt; }
+  .notes { white-space: pre-wrap; margin-top: 4mm; }
+  .reference { margin-bottom: 4mm; font-weight: 700; }
+  .watermark { position: fixed; top: 110mm; right: 0; left: 0; text-align: center;
+               font-size: 70pt; color: rgba(185, 28, 28, 0.12); transform: rotate(-30deg); }
+</style>
+</head>
+<body>
+{% if variant == "draft" %}<div class="watermark">טיוטה</div>{% endif %}
+<header>
+  <div class="business">
+    <h1>{{ business.display_name }}</h1>
+    <div>{{ business.legal_name }}</div>
+    <div>{{ tax_id_label }} <span class="ltr">{{ business.tax_id }}</span></div>
+    {% if business.address %}<div>{{ business.address }}</div>{% endif %}
+    {% if business.phone %}<div>טלפון: <span class="ltr">{{ business.phone }}</span></div>{% endif %}
+    {% if business.email %}<div>דוא״ל: <span class="ltr">{{ business.email }}</span></div>{% endif %}
+  </div>
+  <div class="doc-title">
+    <h2>{{ title }}</h2>
+    <div class="number">{% if doc.number %}מס׳ <span class="ltr">{{ doc.number }}</span>{% else %}&nbsp;{% endif %}</div>
+    <div class="mark {{ variant }}">{{ variant_label }}</div>
+  </div>
+</header>
+
+<div class="meta">
+  <div class="box">
+    <div class="label">{{ "התקבל מאת" if is_receipt else "לכבוד" }}</div>
+    <div><strong>{{ customer.name or "—" }}</strong></div>
+    {% if customer.tax_id %}<div>ח.פ / ת.ז: <span class="ltr">{{ customer.tax_id }}</span></div>{% endif %}
+    {% if customer.address %}<div>{{ customer.address }}</div>{% endif %}
+    {% if customer.phone %}<div>טלפון: <span class="ltr">{{ customer.phone }}</span></div>{% endif %}
+    {% if customer.email %}<div>דוא״ל: <span class="ltr">{{ customer.email }}</span></div>{% endif %}
+  </div>
+  <div class="box">
+    <div><span class="label">תאריך: </span><span class="ltr">{{ issue_date }}</span></div>
+    {% if due_date %}<div><span class="label">לתשלום עד: </span><span class="ltr">{{ due_date }}</span></div>{% endif %}
+    {% if doc.allocation_number %}<div><span class="label">מספר הקצאה: </span><span class="ltr">{{ doc.allocation_number }}</span></div>{% endif %}
+    <div><span class="label">מטבע: </span>{{ "₪ שקל חדש" if doc.currency == "ILS" else doc.currency }}</div>
+  </div>
+</div>
+
+{% for ref in references %}<div class="reference">{{ ref }}</div>{% endfor %}
+
+{% if lines %}
+<table>
+  <thead>
+    <tr><th style="width:4%">#</th><th>תיאור</th><th class="num">כמות</th>
+        <th class="num">מחיר ליחידה{{ " (כולל מע״מ)" if doc.prices_include_vat and shows_vat else "" }}</th>
+        <th class="num">הנחה</th><th class="num">סה״כ</th></tr>
+  </thead>
+  <tbody>
+  {% for line in lines %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ line.description }}{% if line.vat_note %}<br><small>{{ line.vat_note }}</small>{% endif %}</td>
+      <td class="num">{{ line.quantity }}{% if line.unit %} {{ line.unit }}{% endif %}</td>
+      <td class="num">{{ line.unit_price }}</td>
+      <td class="num">{{ line.discount }}</td>
+      <td class="num">{{ line.total }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if payments %}
+<table>
+  <thead><tr><th>אמצעי תשלום</th><th>פרטים</th><th class="num">תאריך</th><th class="num">סכום</th></tr></thead>
+  <tbody>
+  {% for p in payments %}
+    <tr><td>{{ p.method }}</td><td>{{ p.details }}</td><td class="num">{{ p.date }}</td><td class="num">{{ p.amount }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<table class="totals">
+  {% if shows_vat %}
+  <tr><td>סה״כ לפני מע״מ</td><td class="num">{{ totals.subtotal }}</td></tr>
+  {% if totals.discount != "0.00" %}<tr><td>מתוכו הנחות</td><td class="num">{{ totals.discount }}</td></tr>{% endif %}
+  <tr><td>מע״מ {{ vat_percent }}%</td><td class="num">{{ totals.vat }}</td></tr>
+  {% endif %}
+  <tr class="grand"><td>{{ total_label }}</td><td class="num">{{ totals.total }}</td></tr>
+</table>
+
+{% if not shows_vat and exempt_note %}<div>{{ exempt_note }}</div>{% endif %}
+{% if doc.notes %}<div class="notes"><strong>הערות:</strong> {{ doc.notes }}</div>{% endif %}
+</body>
+</html>

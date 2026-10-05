@@ -5,7 +5,7 @@ invoices, receipts, and related documents. It has a Hebrew (RTL) responsive UI,
 a FastAPI backend, PostgreSQL, and a built-in MCP server so AI agents can work
 with the same data under the same security rules.
 
-> Status: **approved. M0 and M1a done; next: M2 (M1b, the Azure dev environment, waits for a subscription)**. Decisions are recorded in [§14](#14-decisions-log).
+> Status: **approved. M0, M1a, M2 and M3 done; next: M1b (Azure dev environment) or M4**. Decisions are recorded in [§14](#14-decisions-log).
 
 ---
 
@@ -264,10 +264,14 @@ service layer as REST.
 **Resources:** `business://{id}/profile`, `document://{id}`, `customer://{id}`.
 **Prompts:** "create invoice from description" and "monthly summary".
 
-**M1a status:** `/mcp` requires a Keycloak bearer token (audience `invoice-api`); tools
-`whoami`, `list_businesses`, `get_business`, `list_members` are live. Member management stays
-web-only on purpose. Fine-grained OAuth scopes (above) and dynamic client registration for
-third-party MCP clients are configured in Keycloak together with the first write tools (M2).
+**Status after M3:** `/mcp` requires a Keycloak bearer token (audience `invoice-api`). Live tools:
+`whoami`, `list_businesses`, `get_business`, `list_members`, `search_customers`,
+`create_customer`, `search_items`, `create_item`, `search_documents`, `get_document`,
+`create_document_draft`, `update_document_draft`, `issue_document` (requires `confirm=true`),
+`create_credit_note`, `convert_document`, `get_document_pdf_link` (10-minute signed link).
+Every tool applies the user's role, two-factor rule and row-level security. Member management
+stays web-only on purpose. Fine-grained OAuth scopes and dynamic client registration move to
+M1b, together with the production Keycloak realm.
 
 Safety: tools never issue documents implicitly. Every MCP action is audited with
 `actor_channel = 'mcp'`. MCP tokens can be revoked per client in Keycloak.
@@ -403,15 +407,32 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 |---|---|---|
 | **M0** ✅ | Foundations | Monorepo skeleton, docker-compose (Postgres, Redis, Keycloak), FastAPI + React "hello", CI (lint, types, tests), pre-commit, Alembic baseline, empty MCP server mounted at `/mcp` |
 | **M1a** ✅ | Auth and tenancy | Keycloak realm, BFF login/logout, JWT validation for MCP, Principal, businesses, members, invitations, roles, RLS policies, audit log, Hebrew RTL app shell |
-| **M1b** | Azure dev environment | Terraform for Azure (Container Apps, PostgreSQL Flexible Server, Key Vault, Static Web Apps), GitHub Actions deploy with OIDC federation, production Keycloak realm (no dev users / password-grant client), budget alert |
-| **M2** | Catalog | Customers and items: CRUD, search, UI, MCP tools |
-| **M3** | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
+| **M1b** | Azure dev environment | Terraform for Azure (Container Apps, PostgreSQL Flexible Server, Blob Storage for PDFs, Key Vault, Static Web Apps), GitHub Actions deploy with OIDC federation, production Keycloak realm (no dev users / password-grant client), OAuth scopes + dynamic client registration for MCP clients, budget alert |
+| **M2** ✅ | Catalog | Customers and items: CRUD, search, UI, MCP tools |
+| **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
 | **M4** | Payments and delivery | Receipts and invoice-receipts, payment methods, payment status, email sending, signed PDF links |
 | **M5** | Notifications | In-app inbox, PWA + Web Push to phones, email notifications, preferences screen, MCP tools |
 | **M6** | Israeli compliance | OPENFRMT export; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
 | **M7** | Reports and dashboard | Revenue/VAT per period, open balances, CSV/Excel export, MCP `get_report` |
 | **M8** | Production hardening | Azure staging + production, observability, backups/restore drill, load test, security review and pen test, privacy policy and terms |
 | **Later** | | Inventory module (§10), WhatsApp/SMS, recurring invoices, online card payment links, multi-currency, accountant portal, digitally signed PDFs, English UI, subscription billing |
+
+---
+
+### M3 implementation notes (for CPA review)
+
+- Separate gapless sequence per business and document type; numbering can start from a chosen
+  number (continuing from previous software) only before the first document of that type.
+- A document cannot be dated in the future or earlier than the last issued document of its type.
+- VAT rate is taken by issue date from `vat_rates` (17% from 2015-10-01, 18% from 2025-01-01);
+  credit notes keep the credited invoice's rate. Exempt dealers and nonprofits charge no VAT and
+  cannot issue tax invoices, invoice-receipts or credit notes.
+- Tax documents require the business address. Invoice-receipt payments must equal the total.
+- Credit notes are created from an issued invoice; their total cannot exceed what is left to credit.
+- The PDF stored at issue time is the original ("מקור"), delivered once; later downloads are
+  rendered as "העתק נאמן למקור". Drafts render with a "טיוטה" watermark.
+- Not yet: linking receipts to the invoices they pay and paid/unpaid status (M4), allocation
+  numbers (feature flag, off), customer tax-ID threshold rules for allocation.
 
 ---
 

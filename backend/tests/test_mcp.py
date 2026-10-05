@@ -103,3 +103,61 @@ async def test_mcp_tools_use_the_same_permissions_as_the_api(idp: FakeIdP) -> No
         assert "Two-factor" in no_mfa["content"][0]["text"]
         assert foreign["isError"] is True
         assert "not found" in foreign["content"][0]["text"].lower()
+
+
+async def test_mcp_invoice_flow_requires_explicit_confirmation(idp: FakeIdP) -> None:
+    owner = FakeUser(email="owner@example.com")
+    async with app_client() as client:
+        browser = await browser_login(client, idp, owner, mfa=True)
+        business = {**VALID_BUSINESS, "address_street": "הרצל 1", "address_city": "תל אביב"}
+        bid = (await browser.post("/api/v1/businesses", json=business)).json()["business"]["id"]
+        token = idp.access_token(owner, mfa=True)
+
+        customer = await call_tool(
+            client, token, "create_customer", {"business_id": bid, "customer": {"name": "לקוח AI"}}
+        )
+        draft = await call_tool(
+            client,
+            token,
+            "create_document_draft",
+            {
+                "business_id": bid,
+                "document": {
+                    "type": "tax_invoice",
+                    "customer_id": customer["structuredContent"]["id"],
+                    "lines": [{"description": "שירות", "unit_price": "100"}],
+                },
+            },
+        )
+        doc_id = draft["structuredContent"]["id"]
+        unconfirmed = await call_tool(
+            client, token, "issue_document", {"business_id": bid, "document_id": doc_id}
+        )
+        issued = await call_tool(
+            client,
+            token,
+            "issue_document",
+            {"business_id": bid, "document_id": doc_id, "confirm": True},
+        )
+        link = await call_tool(
+            client, token, "get_document_pdf_link", {"business_id": bid, "document_id": doc_id}
+        )
+        log = (await browser.get(f"/api/v1/businesses/{bid}/audit-log")).json()
+        client.cookies.clear()  # the signed link works without a session
+        pdf = await client.get(link["structuredContent"]["result"].replace("http://localhost", ""))
+
+        assert draft["structuredContent"]["total"] == "118.00"
+        assert unconfirmed["isError"] is True
+        assert "confirmation_required" in unconfirmed["content"][0]["text"]
+        assert issued["structuredContent"]["number"] == 1
+        assert pdf.status_code == 200
+        assert pdf.content.startswith(b"%PDF")
+        assert {e["actor_channel"] for e in log if e["action"] == "document.issued"} == {"mcp"}
+
+
+async def test_tampered_pdf_link_is_rejected() -> None:
+    async with app_client() as client:
+        response = await client.get("/api/v1/files/document-pdf", params={"token": "abc.def"})
+
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "invalid_link"

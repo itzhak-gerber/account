@@ -81,6 +81,7 @@ services:
     build: ./backend
     environment: *backend-env
     ports: ["8000:8000"]
+    volumes: [files-data:/data/files]
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
@@ -105,3 +106,4 @@ services:
 
 volumes:
   postgres-data:
+  files-data:

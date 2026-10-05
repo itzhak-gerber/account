@@ -73,3 +73,137 @@ export interface AuditEntry {
 export type BusinessInput = Omit<Business, "id" | "default_currency" | "email"> & {
   email: string | null;
 };
+
+export type VatType = "standard" | "exempt" | "zero";
+export type ItemType = "product" | "service";
+export type DocumentType =
+  "quote" | "proforma_invoice" | "tax_invoice" | "receipt" | "tax_invoice_receipt" | "credit_note";
+export type DocumentStatus = "draft" | "issued";
+export type PaymentMethod =
+  "cash" | "check" | "credit_card" | "bank_transfer" | "digital_wallet" | "other";
+
+export interface Customer {
+  id: string;
+  name: string;
+  tax_id: string;
+  email: string;
+  phone: string;
+  address_street: string;
+  address_city: string;
+  address_zip: string;
+  notes: string;
+  is_archived: boolean;
+}
+
+export type CustomerInput = Omit<Customer, "id" | "is_archived" | "email"> & {
+  email: string | null;
+};
+
+export interface Item {
+  id: string;
+  name: string;
+  description: string;
+  item_type: ItemType;
+  sku: string;
+  barcode: string;
+  unit_of_measure: string;
+  unit_price: string;
+  vat_type: VatType;
+  is_archived: boolean;
+}
+
+export type ItemInput = Omit<Item, "id" | "is_archived">;
+
+export interface DocumentTypeInfo {
+  type: DocumentType;
+  title: string;
+  has_lines: boolean;
+  has_payments: boolean;
+  is_tax_document: boolean;
+  shows_vat: boolean;
+  has_due_date: boolean;
+}
+
+export interface CustomerDetails {
+  name: string;
+  tax_id: string;
+  email: string | null;
+  phone: string;
+  address_street: string;
+  address_city: string;
+  address_zip: string;
+}
+
+export interface LineInput {
+  item_id: string | null;
+  description: string;
+  quantity: string;
+  unit_of_measure: string;
+  unit_price: string;
+  discount_percent: string;
+  vat_type: VatType;
+}
+
+export interface PaymentDetails {
+  bank?: string;
+  branch?: string;
+  account?: string;
+  check_number?: string;
+  card_last4?: string;
+  installments?: number | null;
+  reference?: string;
+}
+
+export interface PaymentInput {
+  method: PaymentMethod;
+  amount: string;
+  payment_date: string;
+  details: PaymentDetails;
+}
+
+export interface RelatedDocument {
+  id: string;
+  type: DocumentType;
+  number: number | null;
+  status: DocumentStatus;
+  relation: "converted_from" | "credits" | "pays";
+  direction: "outgoing" | "incoming";
+}
+
+export interface InvoiceDocument {
+  id: string;
+  type: DocumentType;
+  title: string;
+  status: DocumentStatus;
+  number: number | null;
+  issue_date: string;
+  due_date: string | null;
+  customer_id: string | null;
+  customer: CustomerDetails;
+  currency: string;
+  prices_include_vat: boolean;
+  vat_rate: string;
+  subtotal: string;
+  discount_total: string;
+  vat_amount: string;
+  total: string;
+  notes: string;
+  allocation_number: string | null;
+  lines: (LineInput & { id: string; line_total: string })[];
+  payments: (PaymentInput & { id: string })[];
+  related: RelatedDocument[];
+  original_delivered_at: string | null;
+  issued_at: string | null;
+  created_at: string;
+}
+
+export interface DocumentSummary {
+  id: string;
+  type: DocumentType;
+  status: DocumentStatus;
+  number: number | null;
+  issue_date: string;
+  customer_name: string;
+  total: string;
+  created_at: string;
+}

@@ -2,6 +2,21 @@
 
 from app.models.audit import AuditLog
 from app.models.base import Base
+from app.models.catalog import Customer, Item, ItemType, VatType
+from app.models.documents import (
+    Document,
+    DocumentLine,
+    DocumentPayment,
+    DocumentRelation,
+    DocumentSequence,
+    DocumentStatus,
+    DocumentType,
+    OutboxEvent,
+    PaymentMethod,
+    RelationType,
+    StoredFile,
+    VatRate,
+)
 from app.models.identity import Business, BusinessMember, BusinessType, Invitation, Role, User
 
 __all__ = [
@@ -10,7 +25,23 @@ __all__ = [
     "Business",
     "BusinessMember",
     "BusinessType",
+    "Customer",
+    "Document",
+    "DocumentLine",
+    "DocumentPayment",
+    "DocumentRelation",
+    "DocumentSequence",
+    "DocumentStatus",
+    "DocumentType",
     "Invitation",
+    "Item",
+    "ItemType",
+    "OutboxEvent",
+    "PaymentMethod",
+    "RelationType",
     "Role",
+    "StoredFile",
     "User",
+    "VatRate",
+    "VatType",
 ]

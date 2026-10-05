@@ -6,8 +6,12 @@ import { Navigate, Route, Routes, useLocation } from "react-router";
 
 import { useMeQuery } from "../auth/useMe";
 import { SessionProvider } from "../auth/session";
+import { CustomersPage } from "../pages/CustomersPage";
 import { DashboardPage } from "../pages/DashboardPage";
+import { DocumentPage } from "../pages/DocumentPage";
+import { DocumentsPage } from "../pages/DocumentsPage";
 import { InvitePage } from "../pages/InvitePage";
+import { ItemsPage } from "../pages/ItemsPage";
 import { LandingPage } from "../pages/LandingPage";
 import { OnboardingPage } from "../pages/OnboardingPage";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
@@ -31,7 +35,8 @@ function AuthenticatedRoutes() {
   if (!me) return <LandingPage />;
 
   const hasBusiness = me.memberships.length > 0;
-  const placeholders = NAV_ITEMS.filter((item) => !["/", "/settings"].includes(item.path));
+  const built = ["/", "/settings", "/documents", "/customers", "/items"];
+  const placeholders = NAV_ITEMS.filter((item) => !built.includes(item.path));
 
   return (
     <SessionProvider me={me}>
@@ -43,6 +48,10 @@ function AuthenticatedRoutes() {
             <>
               <Route index element={<DashboardPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/documents" element={<DocumentsPage />} />
+              <Route path="/documents/:documentId" element={<DocumentPage />} />
+              <Route path="/customers" element={<CustomersPage />} />
+              <Route path="/items" element={<ItemsPage />} />
               {placeholders.map((item) => (
                 <Route
                   key={item.path}

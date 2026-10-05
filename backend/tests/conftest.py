@@ -2,6 +2,7 @@
 and a fake OpenID Connect provider that signs real JWTs."""
 
 import os
+import tempfile
 
 os.environ.setdefault("APP_ENVIRONMENT", "test")
 os.environ.setdefault(
@@ -14,6 +15,7 @@ os.environ.setdefault("APP_REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("APP_PUBLIC_URL", "http://localhost")
 os.environ.setdefault("APP_OIDC_ISSUER", "http://idp.test/realms/invoice")
 os.environ.setdefault("APP_MCP_ALLOWED_HOSTS", '["localhost", "localhost:*"]')
+os.environ.setdefault("APP_STORAGE_DIR", tempfile.mkdtemp(prefix="invoice-test-files-"))
 
 from collections.abc import AsyncIterator
 from typing import Any
@@ -23,12 +25,27 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.auth import oidc
-from app.core import db, redis
+from app.core import db, redis, storage
 from app.core.config import get_settings
 from app.jobs import queue
 from tests.fake_idp import FakeIdP
 
-TABLES = ["audit_logs", "invitations", "business_members", "businesses", "users"]
+TABLES = [
+    "outbox_events",
+    "document_relations",
+    "document_payments",
+    "document_lines",
+    "documents",
+    "files",
+    "document_sequences",
+    "items",
+    "customers",
+    "audit_logs",
+    "invitations",
+    "business_members",
+    "businesses",
+    "users",
+]
 
 
 @pytest.fixture(autouse=True)
@@ -38,6 +55,7 @@ async def _clean_state() -> AsyncIterator[None]:
     db.get_engine.cache_clear()
     db.get_sessionmaker.cache_clear()
     redis.get_redis.cache_clear()
+    storage.get_storage.cache_clear()
     admin = create_async_engine(os.environ["APP_TEST_ADMIN_DATABASE_URL"])
     async with admin.begin() as conn:
         # Session-local switch so the append-only trigger does not block cleanup.

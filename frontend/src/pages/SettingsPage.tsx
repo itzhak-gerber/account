@@ -15,10 +15,11 @@ import { useSession } from "../auth/context";
 import { can } from "../auth/permissions";
 import { AuditTab } from "../features/settings/AuditTab";
 import { BusinessForm } from "../features/settings/BusinessForm";
+import { NumberingTab } from "../features/settings/NumberingTab";
 import { TeamTab } from "../features/settings/TeamTab";
 import { errorMessage } from "../lib/errors";
 
-type TabKey = "details" | "team" | "audit";
+type TabKey = "details" | "team" | "numbering" | "audit";
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -39,6 +40,7 @@ export function SettingsPage() {
   const { business, role } = current;
   const tabs: TabKey[] = ["details"];
   if (can(role, "viewMembers")) tabs.push("team");
+  tabs.push("numbering");
   if (can(role, "viewAudit")) tabs.push("audit");
 
   return (
@@ -91,6 +93,9 @@ export function SettingsPage() {
         </Card>
       )}
       {tab === "team" && <TeamTab businessId={business.id} role={role} />}
+      {tab === "numbering" && (
+        <NumberingTab businessId={business.id} canEdit={can(role, "manageBusiness")} />
+      )}
       {tab === "audit" && <AuditTab businessId={business.id} />}
     </Stack>
   );

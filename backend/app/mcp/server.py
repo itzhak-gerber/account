@@ -17,14 +17,17 @@ from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.files import document_pdf_link
 from app.auth.oidc import get_oidc_client
-from app.auth.principal import Principal, enter_business, principal_from_bearer
+from app.auth.principal import BusinessContext, Principal, enter_business, principal_from_bearer
 from app.core.config import get_settings
-from app.core.db import get_sessionmaker
+from app.core.db import commit, get_sessionmaker
 from app.core.errors import AppError, NotAuthenticated
-from app.models import Role, User
+from app.models import DocumentStatus, DocumentType, Role, User
+from app.schemas.catalog import CustomerIn, CustomerOut, ItemIn, ItemOut
+from app.schemas.documents import DocumentIn, DocumentOut, DocumentPatch, DocumentSummary
 from app.schemas.identity import BusinessOut, MemberOut, UserOut
-from app.services import businesses
+from app.services import businesses, catalog, documents
 from app.services.system import SystemStatus, get_system_status
 
 
@@ -57,10 +60,22 @@ async def _principal_session() -> AsyncIterator[tuple[AsyncSession, Principal]]:
                 session, get_oidc_client(), access.token, channel="mcp"
             )
             yield session, principal
-            await session.commit()
+            await commit(session)
         except AppError as exc:
             # Business errors (permission, not found, 2FA) are shown to the client as-is.
             raise ToolError(f"{exc.code}: {exc.message}") from exc
+
+
+@asynccontextmanager
+async def _business_session(
+    business_id: uuid.UUID,
+) -> AsyncIterator[tuple[AsyncSession, BusinessContext]]:
+    async with _principal_session() as (session, principal):
+        try:
+            ctx = await enter_business(session, principal, business_id)
+        except AppError as exc:
+            raise ToolError(f"{exc.code}: {exc.message}") from exc
+        yield session, ctx
 
 
 class BusinessSummary(BaseModel):
@@ -131,5 +146,124 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
         async with _principal_session() as (session, principal):
             ctx = await enter_business(session, principal, business_id)
             return await businesses.list_members(session, ctx)
+
+    # --- catalog -------------------------------------------------------------------------
+
+    @mcp.tool()
+    async def search_customers(
+        business_id: uuid.UUID, query: str | None = None, limit: int = 20
+    ) -> list[CustomerOut]:
+        """Find customers by name, tax ID, email or phone. Omit query to list recent ones."""
+        async with _business_session(business_id) as (session, ctx):
+            rows = await catalog.list_customers(session, ctx, q=query, limit=min(limit, 100))
+            return [CustomerOut.model_validate(c) for c in rows]
+
+    @mcp.tool()
+    async def create_customer(business_id: uuid.UUID, customer: CustomerIn) -> CustomerOut:
+        """Add a customer. Search first to avoid duplicates."""
+        async with _business_session(business_id) as (session, ctx):
+            return CustomerOut.model_validate(await catalog.create_customer(session, ctx, customer))
+
+    @mcp.tool()
+    async def search_items(
+        business_id: uuid.UUID, query: str | None = None, limit: int = 20
+    ) -> list[ItemOut]:
+        """Find products/services in the catalog by name, SKU, barcode or description."""
+        async with _business_session(business_id) as (session, ctx):
+            rows = await catalog.list_items(session, ctx, q=query, limit=min(limit, 100))
+            return [ItemOut.model_validate(i) for i in rows]
+
+    @mcp.tool()
+    async def create_item(business_id: uuid.UUID, item: ItemIn) -> ItemOut:
+        """Add a product or service to the catalog (unit_price is before VAT)."""
+        async with _business_session(business_id) as (session, ctx):
+            return ItemOut.model_validate(await catalog.create_item(session, ctx, item))
+
+    # --- documents -----------------------------------------------------------------------
+
+    @mcp.tool()
+    async def search_documents(
+        business_id: uuid.UUID,
+        type: DocumentType | None = None,
+        status: DocumentStatus | None = None,
+        query: str | None = None,
+        limit: int = 20,
+    ) -> list[DocumentSummary]:
+        """List documents, newest first. query matches the customer name or document number."""
+        async with _business_session(business_id) as (session, ctx):
+            return await documents.list_documents(
+                session, ctx, doc_type=type, status=status, q=query, limit=min(limit, 100)
+            )
+
+    @mcp.tool()
+    async def get_document(business_id: uuid.UUID, document_id: uuid.UUID) -> DocumentOut:
+        """Get a document with its lines, payments, VAT and totals."""
+        async with _business_session(business_id) as (session, ctx):
+            doc = await documents.get_document(session, ctx, document_id)
+            return await documents.to_out(session, doc)
+
+    @mcp.tool()
+    async def create_document_draft(business_id: uuid.UUID, document: DocumentIn) -> DocumentOut:
+        """Create a DRAFT quote, proforma, tax invoice, receipt or tax invoice-receipt.
+
+        Prices are before VAT unless prices_include_vat is true; VAT and totals are computed.
+        Receipts have payments instead of lines. Drafts have no number and are not valid
+        documents until issued with issue_document. Credit notes: use create_credit_note.
+        """
+        async with _business_session(business_id) as (session, ctx):
+            doc = await documents.create_draft(session, ctx, document)
+            return await documents.to_out(session, doc)
+
+    @mcp.tool()
+    async def update_document_draft(
+        business_id: uuid.UUID, document_id: uuid.UUID, changes: DocumentPatch
+    ) -> DocumentOut:
+        """Change a draft. Lists (lines, payments) given here replace the existing ones."""
+        async with _business_session(business_id) as (session, ctx):
+            doc = await documents.update_draft(session, ctx, document_id, changes)
+            return await documents.to_out(session, doc)
+
+    @mcp.tool()
+    async def issue_document(
+        business_id: uuid.UUID, document_id: uuid.UUID, confirm: bool = False
+    ) -> DocumentOut:
+        """Issue a draft: assigns the next number and makes it a legal document. IRREVERSIBLE.
+
+        Show the user the customer, lines and total first, and only call this with
+        confirm=true after they explicitly approve. Mistakes are fixed with a credit note.
+        """
+        if not confirm:
+            raise ToolError(
+                "confirmation_required: show the draft to the user and call again with "
+                "confirm=true once they approve. Issuing cannot be undone."
+            )
+        async with _business_session(business_id) as (session, ctx):
+            doc = await documents.issue(session, ctx, document_id)
+            return await documents.to_out(session, doc)
+
+    @mcp.tool()
+    async def create_credit_note(business_id: uuid.UUID, invoice_id: uuid.UUID) -> DocumentOut:
+        """Create a DRAFT credit note for an issued tax invoice (lines copied; edit, then issue)."""
+        async with _business_session(business_id) as (session, ctx):
+            doc = await documents.create_credit_note(session, ctx, invoice_id)
+            return await documents.to_out(session, doc)
+
+    @mcp.tool()
+    async def convert_document(
+        business_id: uuid.UUID, document_id: uuid.UUID, target_type: DocumentType
+    ) -> DocumentOut:
+        """Create a DRAFT from an issued quote/proforma (e.g. quote → tax_invoice)."""
+        async with _business_session(business_id) as (session, ctx):
+            doc = await documents.convert(session, ctx, document_id, target_type)
+            return await documents.to_out(session, doc)
+
+    @mcp.tool()
+    async def get_document_pdf_link(business_id: uuid.UUID, document_id: uuid.UUID) -> str:
+        """Return a link to the document's PDF, valid for 10 minutes."""
+        async with _business_session(business_id) as (session, ctx):
+            await documents.get_document(session, ctx, document_id)
+            return document_pdf_link(
+                ctx.principal, business_id, document_id, get_settings().public_url
+            )
 
     return mcp

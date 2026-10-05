@@ -13,6 +13,11 @@ class Permission(enum.StrEnum):
     MANAGE_MEMBERS = "manage_members"
     MANAGE_OWNERS = "manage_owners"
     VIEW_AUDIT_LOG = "view_audit_log"
+    VIEW_CATALOG = "view_catalog"
+    MANAGE_CATALOG = "manage_catalog"
+    VIEW_DOCUMENTS = "view_documents"
+    EDIT_DRAFTS = "edit_drafts"
+    ISSUE_DOCUMENTS = "issue_documents"
 
 
 _ALL = frozenset(Permission)
@@ -21,10 +26,28 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.OWNER: _ALL,
     Role.ADMIN: _ALL - {Permission.MANAGE_OWNERS},
     Role.ACCOUNTANT: frozenset(
-        {Permission.VIEW_BUSINESS, Permission.VIEW_MEMBERS, Permission.VIEW_AUDIT_LOG}
+        {
+            Permission.VIEW_BUSINESS,
+            Permission.VIEW_MEMBERS,
+            Permission.VIEW_AUDIT_LOG,
+            Permission.VIEW_CATALOG,
+            Permission.VIEW_DOCUMENTS,
+        }
     ),
-    Role.MEMBER: frozenset({Permission.VIEW_BUSINESS, Permission.VIEW_MEMBERS}),
-    Role.VIEWER: frozenset({Permission.VIEW_BUSINESS}),
+    Role.MEMBER: frozenset(
+        {
+            Permission.VIEW_BUSINESS,
+            Permission.VIEW_MEMBERS,
+            Permission.VIEW_CATALOG,
+            Permission.MANAGE_CATALOG,
+            Permission.VIEW_DOCUMENTS,
+            Permission.EDIT_DRAFTS,
+            Permission.ISSUE_DOCUMENTS,
+        }
+    ),
+    Role.VIEWER: frozenset(
+        {Permission.VIEW_BUSINESS, Permission.VIEW_CATALOG, Permission.VIEW_DOCUMENTS}
+    ),
 }
 
 # Roles whose holders must sign in with two-factor authentication.

@@ -1,13 +1,18 @@
-import AddIcon from "@mui/icons-material/Add";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
-import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { Link as RouterLink } from "react-router";
+
+import { api } from "../api/client";
+import type { DocumentSummary } from "../api/types";
+import { DocumentList } from "../features/documents/DocumentList";
+import { NewDocumentButton } from "../features/documents/NewDocumentButton";
 
 import { useSystemStatus } from "../api/system";
 import { useSession } from "../auth/context";
@@ -29,6 +34,12 @@ export function DashboardPage() {
   const { t } = useTranslation();
   const { data, isPending, isError } = useSystemStatus();
   const { current } = useSession();
+  const businessId = current?.business.id;
+  const recent = useQuery({
+    queryKey: ["business", businessId, "documents", "recent"],
+    queryFn: () => api.get<DocumentSummary[]>(`/businesses/${businessId}/documents?limit=5`),
+    enabled: Boolean(businessId),
+  });
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 960 }}>
@@ -49,13 +60,19 @@ export function DashboardPage() {
           )}
           <Typography color="text.secondary">{t("dashboard.subtitle")}</Typography>
         </Box>
-        <Tooltip title={t("common.comingSoon")}>
-          <span>
-            <Button variant="contained" size="large" startIcon={<AddIcon />} disabled fullWidth>
-              {t("dashboard.newDocument")}
-            </Button>
-          </span>
-        </Tooltip>
+        <NewDocumentButton />
+      </Stack>
+
+      <Stack spacing={1}>
+        <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+          <Typography variant="h6" component="h2">
+            {t("documents.recent")}
+          </Typography>
+          <Button component={RouterLink} to="/documents">
+            {t("documents.viewAll")}
+          </Button>
+        </Stack>
+        <DocumentList documents={recent.data} empty={t("documents.empty")} />
       </Stack>
 
       <Card variant="outlined" sx={{ maxWidth: 420 }}>

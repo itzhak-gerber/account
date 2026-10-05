@@ -1,0 +1,177 @@
+import uuid
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
+
+from app.models import DocumentStatus, DocumentType, PaymentMethod, RelationType, VatType
+from app.schemas.catalog import OptionalTaxId, Text20, Text30, Text100, Text200, Text2000
+
+Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
+PositiveMoney = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)]
+Quantity = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=3)]
+Percent = Annotated[Decimal, Field(ge=0, le=100, max_digits=5, decimal_places=2)]
+
+
+class CustomerDetails(BaseModel):
+    """The customer as printed on the document."""
+
+    name: Text200 = ""
+    tax_id: OptionalTaxId = ""
+    email: EmailStr | None = None
+    phone: Text30 = ""
+    address_street: Text200 = ""
+    address_city: Text100 = ""
+    address_zip: Text20 = ""
+
+
+class LineIn(BaseModel):
+    item_id: uuid.UUID | None = None
+    description: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
+    ]
+    quantity: Quantity = Decimal("1")
+    unit_of_measure: Text20 = ""
+    unit_price: Money
+    discount_percent: Percent = Decimal("0")
+    vat_type: VatType = VatType.STANDARD
+
+
+class PaymentDetails(BaseModel):
+    bank: Text30 = ""
+    branch: Text20 = ""
+    account: Text30 = ""
+    check_number: Text30 = ""
+    card_last4: Annotated[str, StringConstraints(pattern=r"^(\d{4})?$")] = ""
+    installments: Annotated[int, Field(ge=1, le=36)] | None = None
+    reference: Text100 = ""
+
+
+class PaymentIn(BaseModel):
+    method: PaymentMethod
+    amount: PositiveMoney
+    payment_date: date
+    details: PaymentDetails = PaymentDetails()
+
+
+class DocumentIn(BaseModel):
+    type: DocumentType
+    issue_date: date | None = None
+    due_date: date | None = None
+    customer_id: uuid.UUID | None = None
+    customer: CustomerDetails | None = None
+    prices_include_vat: bool = False
+    lines: Annotated[list[LineIn], Field(max_length=200)] = []
+    payments: Annotated[list[PaymentIn], Field(max_length=20)] = []
+    notes: Text2000 = ""
+
+
+class DocumentPatch(BaseModel):
+    issue_date: date | None = None
+    due_date: date | None = None
+    customer_id: uuid.UUID | None = None
+    customer: CustomerDetails | None = None
+    prices_include_vat: bool | None = None
+    lines: Annotated[list[LineIn], Field(max_length=200)] | None = None
+    payments: Annotated[list[PaymentIn], Field(max_length=20)] | None = None
+    notes: Text2000 | None = None
+
+
+class LineOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    item_id: uuid.UUID | None
+    description: str
+    quantity: Decimal
+    unit_of_measure: str
+    unit_price: Decimal
+    discount_percent: Decimal
+    vat_type: VatType
+    line_total: Decimal
+
+
+class PaymentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    method: PaymentMethod
+    amount: Decimal
+    payment_date: date
+    details: dict[str, object]
+
+    @field_validator("details", mode="before")
+    @classmethod
+    def _drop_empty(cls, value: dict[str, object]) -> dict[str, object]:
+        return {k: v for k, v in (value or {}).items() if v not in ("", None)}
+
+
+class RelatedDocument(BaseModel):
+    id: uuid.UUID
+    type: DocumentType
+    number: int | None
+    status: DocumentStatus
+    relation: RelationType
+    # "outgoing": this document → related (e.g. credit note → invoice); "incoming": the reverse.
+    direction: str
+
+
+class DocumentOut(BaseModel):
+    id: uuid.UUID
+    type: DocumentType
+    title: str
+    status: DocumentStatus
+    number: int | None
+    issue_date: date
+    due_date: date | None
+    customer_id: uuid.UUID | None
+    customer: CustomerDetails
+    currency: str
+    prices_include_vat: bool
+    vat_rate: Decimal
+    subtotal: Decimal
+    discount_total: Decimal
+    vat_amount: Decimal
+    total: Decimal
+    notes: str
+    allocation_number: str | None
+    lines: list[LineOut]
+    payments: list[PaymentOut]
+    related: list[RelatedDocument]
+    original_delivered_at: datetime | None
+    issued_at: datetime | None
+    created_at: datetime
+
+
+class DocumentSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    type: DocumentType
+    status: DocumentStatus
+    number: int | None
+    issue_date: date
+    customer_name: str
+    total: Decimal
+    created_at: datetime
+
+
+class ConvertIn(BaseModel):
+    type: DocumentType
+
+
+class NumberingOut(BaseModel):
+    next_numbers: dict[DocumentType, int]
+
+
+class NumberingIn(BaseModel):
+    type: DocumentType
+    next_number: Annotated[int, Field(ge=1, le=99_999_999)]
+
+
+class DocumentTypeInfo(BaseModel):
+    type: DocumentType
+    title: str
+    has_lines: bool
+    has_payments: bool
+    is_tax_document: bool
+    shows_vat: bool
+    has_due_date: bool
