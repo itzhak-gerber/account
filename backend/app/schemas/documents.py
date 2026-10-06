@@ -1,13 +1,14 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
 
 from app.models import DocumentStatus, DocumentType, PaymentMethod, RelationType, VatType
 from app.schemas.catalog import OptionalTaxId, Text20, Text30, Text100, Text200, Text2000
 
+PaymentStatus = Literal["unpaid", "partial", "paid"]
 Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
 PositiveMoney = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)]
 Quantity = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=3)]
@@ -55,6 +56,23 @@ class PaymentIn(BaseModel):
     details: PaymentDetails = PaymentDetails()
 
 
+class AllocationIn(BaseModel):
+    """Part of a receipt applied to an issued invoice (tax invoice or proforma)."""
+
+    invoice_id: uuid.UUID
+    amount: PositiveMoney
+
+
+class AllocationOut(BaseModel):
+    invoice_id: uuid.UUID
+    invoice_type: DocumentType
+    invoice_number: int | None
+    invoice_date: date
+    invoice_total: Decimal
+    amount: Decimal
+    balance_due: Decimal
+
+
 class DocumentIn(BaseModel):
     type: DocumentType
     issue_date: date | None = None
@@ -64,6 +82,7 @@ class DocumentIn(BaseModel):
     prices_include_vat: bool = False
     lines: Annotated[list[LineIn], Field(max_length=200)] = []
     payments: Annotated[list[PaymentIn], Field(max_length=20)] = []
+    allocations: Annotated[list[AllocationIn], Field(max_length=50)] = []
     notes: Text2000 = ""
 
 
@@ -75,6 +94,7 @@ class DocumentPatch(BaseModel):
     prices_include_vat: bool | None = None
     lines: Annotated[list[LineIn], Field(max_length=200)] | None = None
     payments: Annotated[list[PaymentIn], Field(max_length=20)] | None = None
+    allocations: Annotated[list[AllocationIn], Field(max_length=50)] | None = None
     notes: Text2000 | None = None
 
 
@@ -111,6 +131,7 @@ class RelatedDocument(BaseModel):
     number: int | None
     status: DocumentStatus
     relation: RelationType
+    amount: Decimal | None = None
     # "outgoing": this document → related (e.g. credit note → invoice); "incoming": the reverse.
     direction: str
 
@@ -134,6 +155,12 @@ class DocumentOut(BaseModel):
     total: Decimal
     notes: str
     allocation_number: str | None
+    # Invoices only: what is paid, credited and still open.
+    payment_status: PaymentStatus | None
+    amount_paid: Decimal
+    amount_credited: Decimal
+    balance_due: Decimal | None
+    allocations: list[AllocationOut]
     lines: list[LineOut]
     payments: list[PaymentOut]
     related: list[RelatedDocument]
@@ -151,6 +178,8 @@ class DocumentSummary(BaseModel):
     issue_date: date
     customer_name: str
     total: Decimal
+    payment_status: PaymentStatus | None = None
+    balance_due: Decimal | None = None
     created_at: datetime
 
 

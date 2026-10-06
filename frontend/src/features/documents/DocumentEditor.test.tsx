@@ -17,6 +17,7 @@ const BUSINESS = {
   phone: "",
   email: "",
   default_currency: "ILS",
+  has_logo: false,
 };
 const ME = {
   user: { id: "u1", email: "owner@example.com", full_name: "ישראל" },
@@ -33,6 +34,15 @@ const TYPES = [
     is_tax_document: true,
     shows_vat: true,
     has_due_date: true,
+  },
+  {
+    type: "receipt",
+    title: "קבלה",
+    has_lines: false,
+    has_payments: true,
+    is_tax_document: false,
+    shows_vat: false,
+    has_due_date: false,
   },
 ];
 
@@ -71,6 +81,11 @@ function issuedDoc(id: string) {
     total: "1180.00",
     notes: "",
     allocation_number: null,
+    payment_status: "unpaid",
+    amount_paid: "0.00",
+    amount_credited: "0.00",
+    balance_due: "1180.00",
+    allocations: [],
     lines: [],
     payments: [],
     related: [],
@@ -137,6 +152,44 @@ describe("DocumentEditor", () => {
       type: "tax_invoice",
       customer: { name: "לקוח" },
       lines: [{ description: "ייעוץ", quantity: "1", unit_price: "1000" }],
+    });
+  });
+
+  it("starts a receipt from an unpaid invoice with its balance pre-filled", async () => {
+    const calls: { method: string; url: string; body: unknown }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+        if (url === "/api/v1/me") return json(ME);
+        if (url.endsWith("/document-types")) return json(TYPES);
+        if (url.endsWith("/documents/inv1")) return json({ ...issuedDoc("inv1"), number: 7 });
+        if (method === "POST" && url.endsWith("/documents"))
+          return json({ ...issuedDoc("r1"), type: "receipt", status: "draft", number: null }, 201);
+        return json([]);
+      }),
+    );
+    render(
+      <MemoryRouter initialEntries={["/documents/new?type=receipt&invoice=inv1"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+
+    expect(await screen.findByText(/חשבונית מס מס׳ 7/)).toBeInTheDocument();
+    expect(screen.getByLabelText("סכום לחשבונית זו")).toHaveValue("1180.00");
+    await user.clear(screen.getByLabelText("סכום לחשבונית זו"));
+    await user.type(screen.getByLabelText("סכום לחשבונית זו"), "500");
+    await user.click(screen.getByRole("button", { name: "שמירת טיוטה" }));
+
+    const post = calls.find((c) => c.method === "POST");
+    expect(post?.body).toMatchObject({
+      type: "receipt",
+      customer: { name: "לקוח" },
+      allocations: [{ invoice_id: "inv1", amount: "500" }],
+      payments: [{ method: "bank_transfer", amount: "1180.00" }],
     });
   });
 });

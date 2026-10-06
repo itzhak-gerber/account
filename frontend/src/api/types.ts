@@ -19,6 +19,7 @@ export interface Business {
   phone: string;
   email: string;
   default_currency: string;
+  has_logo: boolean;
 }
 
 export interface Membership {
@@ -70,7 +71,7 @@ export interface AuditEntry {
   created_at: string;
 }
 
-export type BusinessInput = Omit<Business, "id" | "default_currency" | "email"> & {
+export type BusinessInput = Omit<Business, "id" | "default_currency" | "email" | "has_logo"> & {
   email: string | null;
 };
 
@@ -161,12 +162,30 @@ export interface PaymentInput {
   details: PaymentDetails;
 }
 
+export type PaymentStatus = "unpaid" | "partial" | "paid";
+
+export interface AllocationInput {
+  invoice_id: string;
+  amount: string;
+}
+
+export interface Allocation {
+  invoice_id: string;
+  invoice_type: DocumentType;
+  invoice_number: number | null;
+  invoice_date: string;
+  invoice_total: string;
+  amount: string;
+  balance_due: string;
+}
+
 export interface RelatedDocument {
   id: string;
   type: DocumentType;
   number: number | null;
   status: DocumentStatus;
   relation: "converted_from" | "credits" | "pays";
+  amount: string | null;
   direction: "outgoing" | "incoming";
 }
 
@@ -189,6 +208,11 @@ export interface InvoiceDocument {
   total: string;
   notes: string;
   allocation_number: string | null;
+  payment_status: PaymentStatus | null;
+  amount_paid: string;
+  amount_credited: string;
+  balance_due: string | null;
+  allocations: Allocation[];
   lines: (LineInput & { id: string; line_total: string })[];
   payments: (PaymentInput & { id: string })[];
   related: RelatedDocument[];
@@ -205,5 +229,7 @@ export interface DocumentSummary {
   issue_date: string;
   customer_name: string;
   total: string;
+  payment_status: PaymentStatus | null;
+  balance_due: string | null;
   created_at: string;
 }

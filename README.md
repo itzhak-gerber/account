@@ -46,6 +46,10 @@ You can also register new users from the login page; the verification email arri
    **הפקת המסמך** (issue). Issued documents get the next number and can no longer change.
 4. From an issued quote: convert to an invoice. From an invoice: **הפקת זיכוי** (credit note).
 5. **הורדת PDF**: the first download is the original (מקור), later ones are marked as copies.
+6. **Settings → פרטי העסק**: upload the business logo; it prints on new documents.
+7. **Receipts pay invoices**: in a receipt, pick open invoices (the amount fills in with the open
+   balance and can be changed), or press **הפקת קבלה** on an unpaid invoice. Invoices then show
+   paid / partly paid, and the documents list has a **לא שולמו** (unpaid) filter.
 
 ### Connecting an AI assistant (MCP)
 

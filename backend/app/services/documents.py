@@ -29,6 +29,8 @@ from app.models import (
 )
 from app.pdf.render import Variant, render_pdf
 from app.schemas.documents import (
+    AllocationIn,
+    AllocationOut,
     CustomerDetails,
     DocumentIn,
     DocumentOut,
@@ -38,9 +40,10 @@ from app.schemas.documents import (
     LineOut,
     PaymentIn,
     PaymentOut,
+    PaymentStatus,
     RelatedDocument,
 )
-from app.services import audit, catalog, numbering, vat
+from app.services import audit, branding, catalog, numbering, vat
 from app.services.calc import ZERO, LineInput, compute_totals, money
 from app.services.document_rules import (
     CONVERSIONS,
@@ -103,6 +106,7 @@ def _business_snapshot(business: Business) -> dict[str, Any]:
         "address_zip": business.address_zip,
         "phone": business.phone,
         "email": business.email,
+        "logo_file_id": str(business.logo_file_id) if business.logo_file_id else None,
     }
 
 
@@ -216,6 +220,86 @@ async def _recalculate(session: AsyncSession, business: Business, document: Docu
     document.total = totals.total
 
 
+# --- payments applied to invoices ------------------------------------------------------
+
+# Documents that are a demand for payment and can be paid by receipts.
+PAYABLE = frozenset({DocumentType.TAX_INVOICE, DocumentType.PROFORMA_INVOICE})
+
+
+def balance_due(document: Document) -> Decimal:
+    return document.total - document.amount_paid - document.amount_credited
+
+
+def payment_status(document: Document) -> tuple[PaymentStatus | None, Decimal | None]:
+    if document.status != DocumentStatus.ISSUED:
+        return None, None
+    if document.type == DocumentType.TAX_INVOICE_RECEIPT:
+        return "paid", money(ZERO)
+    if document.type not in PAYABLE:
+        return None, None
+    balance = balance_due(document)
+    if balance <= ZERO:
+        return "paid", money(ZERO)
+    if document.amount_paid > ZERO or document.amount_credited > ZERO:
+        return "partial", money(balance)
+    return "unpaid", money(balance)
+
+
+async def _set_allocations(
+    session: AsyncSession, ctx: BusinessContext, document: Document, allocations: list[AllocationIn]
+) -> None:
+    if allocations and DocumentType(document.type) != DocumentType.RECEIPT:
+        raise InvalidDocument(
+            "Only receipts can be applied to invoices", code="allocations_not_allowed"
+        )
+    seen: set[uuid.UUID] = set()
+    for allocation in allocations:
+        if allocation.invoice_id in seen:
+            raise InvalidDocument("An invoice appears twice", code="allocation_duplicate")
+        seen.add(allocation.invoice_id)
+        invoice = await _load(session, ctx, allocation.invoice_id)
+        if invoice.status != DocumentStatus.ISSUED or invoice.type not in PAYABLE:
+            raise InvalidDocument(
+                "Receipts can only pay issued tax invoices or proformas",
+                code="allocation_invalid_invoice",
+            )
+    existing = await session.scalars(
+        select(DocumentRelation).where(
+            DocumentRelation.from_document_id == document.id,
+            DocumentRelation.relation == RelationType.PAYS,
+        )
+    )
+    for relation in existing:
+        await session.delete(relation)
+    await session.flush()
+    for allocation in allocations:
+        session.add(
+            DocumentRelation(
+                business_id=ctx.business_id,
+                from_document_id=document.id,
+                to_document_id=allocation.invoice_id,
+                relation=RelationType.PAYS,
+                amount=allocation.amount,
+            )
+        )
+    await session.flush()
+
+
+async def _allocations(
+    session: AsyncSession, document: Document
+) -> list[tuple[DocumentRelation, Document]]:
+    rows = await session.execute(
+        select(DocumentRelation, Document)
+        .join(Document, Document.id == DocumentRelation.to_document_id)
+        .where(
+            DocumentRelation.from_document_id == document.id,
+            DocumentRelation.relation == RelationType.PAYS,
+        )
+        .order_by(DocumentRelation.created_at, Document.number)
+    )
+    return [(rel, invoice) for rel, invoice in rows.all()]
+
+
 # --- reading ---------------------------------------------------------------------------
 
 
@@ -240,6 +324,7 @@ async def related(session: AsyncSession, document: Document) -> list[RelatedDocu
             number=other.number,
             status=DocumentStatus(other.status),
             relation=RelationType(rel.relation),
+            amount=rel.amount,
             direction="outgoing" if rel.from_document_id == document.id else "incoming",
         )
         for rel, other in rows.all()
@@ -247,6 +332,19 @@ async def related(session: AsyncSession, document: Document) -> list[RelatedDocu
 
 
 async def to_out(session: AsyncSession, document: Document) -> DocumentOut:
+    status, balance = payment_status(document)
+    allocations = [
+        AllocationOut(
+            invoice_id=invoice.id,
+            invoice_type=DocumentType(invoice.type),
+            invoice_number=invoice.number,
+            invoice_date=invoice.issue_date,
+            invoice_total=invoice.total,
+            amount=rel.amount or ZERO,
+            balance_due=balance_due(invoice),
+        )
+        for rel, invoice in await _allocations(session, document)
+    ]
     return DocumentOut(
         id=document.id,
         type=DocumentType(document.type),
@@ -268,6 +366,11 @@ async def to_out(session: AsyncSession, document: Document) -> DocumentOut:
         total=document.total,
         notes=document.notes,
         allocation_number=document.allocation_number,
+        payment_status=status,
+        amount_paid=document.amount_paid,
+        amount_credited=document.amount_credited,
+        balance_due=balance,
+        allocations=allocations,
         lines=[LineOut.model_validate(line) for line in document.lines],
         payments=[PaymentOut.model_validate(p) for p in document.payments],
         related=await related(session, document),
@@ -294,6 +397,7 @@ async def list_documents(
     q: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    open_only: bool = False,
     limit: int = 50,
     offset: int = 0,
 ) -> list[DocumentSummary]:
@@ -309,6 +413,13 @@ async def list_documents(
         query = query.where(Document.issue_date >= date_from)
     if date_to:
         query = query.where(Document.issue_date <= date_to)
+    if open_only:
+        # Issued invoices with something left to pay (for receipts and unpaid reports).
+        query = query.where(
+            Document.status == DocumentStatus.ISSUED,
+            Document.type.in_(PAYABLE),
+            Document.total - Document.amount_paid - Document.amount_credited > 0,
+        )
     if q:
         text = q.strip()
         condition = Document.customer["name"].astext.ilike(f"%{text.replace('%', '')}%")
@@ -316,7 +427,8 @@ async def list_documents(
             condition = or_(condition, Document.number == int(text))
         query = query.where(condition)
     query = query.order_by(Document.issue_date.desc(), Document.created_at.desc())
-    documents = await session.scalars(query.limit(min(limit, 200)).offset(offset))
+    documents = list(await session.scalars(query.limit(min(limit, 200)).offset(offset)))
+    statuses = {d.id: payment_status(d) for d in documents}
     return [
         DocumentSummary(
             id=d.id,
@@ -326,6 +438,8 @@ async def list_documents(
             issue_date=d.issue_date,
             customer_name=(d.customer or {}).get("name", ""),
             total=d.total,
+            payment_status=statuses[d.id][0],
+            balance_due=statuses[d.id][1],
             created_at=d.created_at,
         )
         for d in documents
@@ -358,6 +472,7 @@ async def create_draft(session: AsyncSession, ctx: BusinessContext, data: Docume
         vat_rate=ZERO,
         notes=data.notes,
         amount_paid=ZERO,
+        amount_credited=ZERO,
         source=ctx.principal.channel,
         created_by_user_id=ctx.principal.user_id,
     )
@@ -367,6 +482,7 @@ async def create_draft(session: AsyncSession, ctx: BusinessContext, data: Docume
     await _recalculate(session, business, document)
     session.add(document)
     await session.flush()
+    await _set_allocations(session, ctx, document, data.allocations)
     await audit.record(
         session,
         ctx.principal,
@@ -404,6 +520,8 @@ async def update_draft(
         await _set_lines(session, ctx, document, patch.lines)
     if patch.payments is not None:
         _set_payments(ctx, document, patch.payments)
+    if patch.allocations is not None:
+        await _set_allocations(session, ctx, document, patch.allocations)
     if patch.notes is not None:
         document.notes = patch.notes
     await _recalculate(session, business, document)
@@ -448,6 +566,7 @@ async def _new_draft_from(
         vat_rate=source.vat_rate if target_type == DocumentType.CREDIT_NOTE else ZERO,
         notes=source.notes,
         amount_paid=ZERO,
+        amount_credited=ZERO,
         source=ctx.principal.channel,
         created_by_user_id=ctx.principal.user_id,
         lines=[
@@ -602,6 +721,61 @@ async def _validate_for_issue(
             )
 
 
+async def _apply_to_invoices(session: AsyncSession, document: Document) -> None:
+    """Record what an issued document pays or credits on its invoices (locked rows)."""
+    doc_type = DocumentType(document.type)
+    if doc_type == DocumentType.TAX_INVOICE_RECEIPT:
+        document.amount_paid = document.total
+        return
+    if doc_type == DocumentType.CREDIT_NOTE:
+        credited = await _credited_invoice(session, document)
+        if credited is not None:
+            invoice = await _lock(session, credited.id)
+            invoice.amount_credited += document.total
+        return
+    if doc_type != DocumentType.RECEIPT:
+        return
+    allocations = await _allocations(session, document)
+    allocated = sum((rel.amount or ZERO for rel, _ in allocations), ZERO)
+    if allocated > document.total:
+        raise InvalidDocument(
+            f"The invoices ({allocated}) exceed the receipt total ({document.total})",
+            code="allocations_exceed_receipt",
+        )
+    for rel, unlocked in allocations:
+        invoice = await _lock(session, unlocked.id)
+        if (
+            document.customer_id
+            and invoice.customer_id
+            and invoice.customer_id != document.customer_id
+        ):
+            raise InvalidDocument(
+                f"Invoice {invoice.number} belongs to another customer",
+                code="allocation_customer_mismatch",
+            )
+        balance = balance_due(invoice)
+        if (rel.amount or ZERO) > balance:
+            raise InvalidDocument(
+                f"The amount for invoice {invoice.number} exceeds its open balance ({balance})",
+                code="allocation_exceeds_balance",
+                invoice_number=invoice.number,
+                balance=str(balance),
+            )
+        invoice.amount_paid += rel.amount or ZERO
+
+
+async def _lock(session: AsyncSession, document_id: uuid.UUID) -> Document:
+    # populate_existing: re-read after the lock, so a concurrent receipt's update is not lost.
+    invoice = await session.scalar(
+        select(Document)
+        .where(Document.id == document_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    assert invoice is not None
+    return invoice
+
+
 async def references_for(session: AsyncSession, document: Document) -> list[str]:
     lines = []
     for rel in await related(session, document):
@@ -612,6 +786,8 @@ async def references_for(session: AsyncSession, document: Document) -> list[str]
             lines.append(f"זיכוי עבור {title} מס׳ {rel.number}")
         elif rel.relation == RelationType.CONVERTED_FROM:
             lines.append(f"בהמשך ל{title} מס׳ {rel.number}")
+        elif rel.relation == RelationType.PAYS and rel.amount is not None:
+            lines.append(f"תשלום עבור {title} מס׳ {rel.number}: {rel.amount:,.2f}")
     return lines
 
 
@@ -623,6 +799,7 @@ async def issue(session: AsyncSession, ctx: BusinessContext, document_id: uuid.U
     business = await _business(session, ctx)
     await _recalculate(session, business, document)  # VAT rate for the final issue date
     await _validate_for_issue(session, business, document)
+    await _apply_to_invoices(session, document)
 
     document.number = await numbering.next_number(
         session, ctx.business_id, DocumentType(document.type)
@@ -633,7 +810,11 @@ async def issue(session: AsyncSession, ctx: BusinessContext, document_id: uuid.U
     document.issued_by_user_id = ctx.principal.user_id
 
     pdf = await render_pdf(
-        document, document.business_snapshot, "original", await references_for(session, document)
+        document,
+        document.business_snapshot,
+        "original",
+        await references_for(session, document),
+        await branding.load_file(session, business.logo_file_id),
     )
     stored = await get_storage().put(f"{ctx.business_id}/documents/{document.id}/original.pdf", pdf)
     file = StoredFile(
@@ -689,6 +870,7 @@ async def pdf(
             _business_snapshot(business),
             "draft",
             await references_for(session, document),
+            await branding.load_file(session, business.logo_file_id),
         )
         return content, name, "draft"
     if document.original_delivered_at is None and document.original_pdf_file_id:
@@ -707,7 +889,12 @@ async def pdf(
         )
         return content, name, "original"
     assert document.business_snapshot is not None
+    # Copies use the logo the document was issued with, not today's logo.
     content = await render_pdf(
-        document, document.business_snapshot, "copy", await references_for(session, document)
+        document,
+        document.business_snapshot,
+        "copy",
+        await references_for(session, document),
+        await branding.load_file(session, document.business_snapshot.get("logo_file_id")),
     )
     return content, name, "copy"

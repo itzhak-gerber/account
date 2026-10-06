@@ -92,7 +92,9 @@ class Document(IdMixin, TimestampMixin, Base):
     discount_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     vat_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    # Updated after issue: receipts paying this invoice, and credit notes against it.
     amount_paid: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    amount_credited: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     notes: Mapped[str] = mapped_column(Text, default="")
     allocation_number: Mapped[str | None] = mapped_column(String(20))
     original_pdf_file_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("files.id"))
@@ -169,6 +171,8 @@ class DocumentRelation(IdMixin, Base):
         ForeignKey("documents.id", ondelete="RESTRICT"), index=True
     )
     relation: Mapped[RelationType] = mapped_column(String(20))
+    # For "pays": the part of the receipt applied to that invoice.
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

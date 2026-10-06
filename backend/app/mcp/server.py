@@ -129,16 +129,14 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
         """List the businesses the signed-in user belongs to, with their role in each."""
         async with _principal_session() as (session, principal):
             rows = await businesses.list_for_user(session, principal)
-            return [
-                BusinessSummary(business=BusinessOut.model_validate(b), role=r) for b, r in rows
-            ]
+            return [BusinessSummary(business=BusinessOut.from_business(b), role=r) for b, r in rows]
 
     @mcp.tool()
     async def get_business(business_id: uuid.UUID) -> BusinessOut:
         """Get a business's details (name, tax ID, type, address, contact)."""
         async with _principal_session() as (session, principal):
             ctx = await enter_business(session, principal, business_id)
-            return BusinessOut.model_validate(await businesses.get_business(session, ctx))
+            return BusinessOut.from_business(await businesses.get_business(session, ctx))
 
     @mcp.tool()
     async def list_members(business_id: uuid.UUID) -> list[MemberOut]:
@@ -187,12 +185,22 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
         type: DocumentType | None = None,
         status: DocumentStatus | None = None,
         query: str | None = None,
+        unpaid_only: bool = False,
         limit: int = 20,
     ) -> list[DocumentSummary]:
-        """List documents, newest first. query matches the customer name or document number."""
+        """List documents, newest first. query matches the customer name or document number.
+
+        unpaid_only: issued tax invoices/proformas with an open balance (balance_due).
+        """
         async with _business_session(business_id) as (session, ctx):
             return await documents.list_documents(
-                session, ctx, doc_type=type, status=status, q=query, limit=min(limit, 100)
+                session,
+                ctx,
+                doc_type=type,
+                status=status,
+                q=query,
+                open_only=unpaid_only,
+                limit=min(limit, 100),
             )
 
     @mcp.tool()
@@ -207,7 +215,9 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
         """Create a DRAFT quote, proforma, tax invoice, receipt or tax invoice-receipt.
 
         Prices are before VAT unless prices_include_vat is true; VAT and totals are computed.
-        Receipts have payments instead of lines. Drafts have no number and are not valid
+        Receipts have payments instead of lines, and can list the invoices they pay in
+        allocations (find them with search_documents unpaid_only=true).
+        Drafts have no number and are not valid
         documents until issued with issue_document. Credit notes: use create_credit_note.
         """
         async with _business_session(business_id) as (session, ctx):

@@ -29,7 +29,7 @@ async def me(
     return MeOut(
         user=UserOut.model_validate(user),
         memberships=[
-            MembershipOut(business=BusinessOut.model_validate(b), role=role)
+            MembershipOut(business=BusinessOut.from_business(b), role=role)
             for b, role in memberships
         ],
         mfa=principal.mfa,

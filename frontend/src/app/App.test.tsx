@@ -18,6 +18,7 @@ const BUSINESS = {
   phone: "",
   email: "",
   default_currency: "ILS",
+  has_logo: false,
 };
 
 function me(overrides: Partial<Me> = {}): Me {

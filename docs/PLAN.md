@@ -410,7 +410,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M1b** | Azure dev environment | Terraform for Azure (Container Apps, PostgreSQL Flexible Server, Blob Storage for PDFs, Key Vault, Static Web Apps), GitHub Actions deploy with OIDC federation, production Keycloak realm (no dev users / password-grant client), OAuth scopes + dynamic client registration for MCP clients, budget alert |
 | **M2** ✅ | Catalog | Customers and items: CRUD, search, UI, MCP tools |
 | **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
-| **M4** | Payments and delivery | Receipts and invoice-receipts, payment methods, payment status, email sending, signed PDF links |
+| **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links; remaining: email sending to customers |
 | **M5** | Notifications | In-app inbox, PWA + Web Push to phones, email notifications, preferences screen, MCP tools |
 | **M6** | Israeli compliance | OPENFRMT export; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
 | **M7** | Reports and dashboard | Revenue/VAT per period, open balances, CSV/Excel export, MCP `get_report` |
@@ -431,8 +431,13 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 - Credit notes are created from an issued invoice; their total cannot exceed what is left to credit.
 - The PDF stored at issue time is the original ("מקור"), delivered once; later downloads are
   rendered as "העתק נאמן למקור". Drafts render with a "טיוטה" watermark.
-- Not yet: linking receipts to the invoices they pay and paid/unpaid status (M4), allocation
-  numbers (feature flag, off), customer tax-ID threshold rules for allocation.
+- Receipts can be applied to issued tax invoices/proformas (one or many, any amount up to each
+  open balance, total up to the receipt). On issue, invoices get `amount_paid`; credit notes add
+  `amount_credited`; invoice-receipts are paid in full. Status: unpaid / partial / paid, and
+  `open_only` lists invoices with a balance (basis for the unpaid-invoices report, M7).
+- Business logo (PNG/JPG, re-encoded and resized) prints on documents; issued documents keep the
+  logo they were issued with.
+- Not yet: allocation numbers (feature flag, off), customer tax-ID threshold rules for allocation.
 
 ---
 

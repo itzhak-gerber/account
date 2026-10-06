@@ -242,6 +242,7 @@ async def test_quote_converts_to_invoice(idp: FakeIdP) -> None:
                 "number": 1,
                 "status": "issued",
                 "relation": "converted_from",
+                "amount": None,
                 "direction": "outgoing",
             }
         ]

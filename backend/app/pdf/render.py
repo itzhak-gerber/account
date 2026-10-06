@@ -1,5 +1,6 @@
 """Render documents to PDF (WeasyPrint + Jinja2, Hebrew right-to-left, embedded Heebo font)."""
 
+import base64
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -67,7 +68,11 @@ def _address(data: dict[str, Any]) -> str:
 
 
 def _context(
-    doc: Document, business: dict[str, Any], variant: Variant, references: list[str]
+    doc: Document,
+    business: dict[str, Any],
+    variant: Variant,
+    references: list[str],
+    logo: bytes | None,
 ) -> dict[str, Any]:
     rules = RULES[DocumentType(doc.type)]
     business_type = BusinessType(business["business_type"])
@@ -136,21 +141,30 @@ def _context(
         "total_label": total_label,
         "exempt_note": exempt_note,
         "references": references,
+        "logo": f"data:image/png;base64,{base64.b64encode(logo).decode()}" if logo else None,
         "footer": "מסמך ממוחשב · הופק באמצעות מערכת חשבוניות",
     }
 
 
 def render_html(
-    doc: Document, business: dict[str, Any], variant: Variant, references: list[str] | None = None
+    doc: Document,
+    business: dict[str, Any],
+    variant: Variant,
+    references: list[str] | None = None,
+    logo: bytes | None = None,
 ) -> str:
     return _env.get_template("document.html").render(
-        **_context(doc, business, variant, references or [])
+        **_context(doc, business, variant, references or [], logo)
     )
 
 
 async def render_pdf(
-    doc: Document, business: dict[str, Any], variant: Variant, references: list[str] | None = None
+    doc: Document,
+    business: dict[str, Any],
+    variant: Variant,
+    references: list[str] | None = None,
+    logo: bytes | None = None,
 ) -> bytes:
-    html = render_html(doc, business, variant, references)
+    html = render_html(doc, business, variant, references, logo)
     pdf: bytes = await anyio.to_thread.run_sync(lambda: HTML(string=html).write_pdf())
     return pdf

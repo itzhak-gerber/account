@@ -1,10 +1,12 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, UploadFile, status
+from fastapi.responses import Response
 
 from app.auth.principal import CurrentBusiness, CurrentPrincipal, DbSession
 from app.core.db import commit
+from app.core.errors import NotFound
 from app.models import User
 from app.schemas.identity import (
     AuditEntryOut,
@@ -19,7 +21,7 @@ from app.schemas.identity import (
     MembershipOut,
     RoleChange,
 )
-from app.services import audit, businesses, invitations
+from app.services import audit, branding, businesses, invitations
 
 router = APIRouter(tags=["businesses"])
 
@@ -29,21 +31,21 @@ async def create_business(
     data: BusinessIn, principal: CurrentPrincipal, session: DbSession
 ) -> MembershipOut:
     business = await businesses.create_business(session, principal, data)
-    out = MembershipOut(business=BusinessOut.model_validate(business), role="owner")
+    out = MembershipOut(business=BusinessOut.from_business(business), role="owner")
     await commit(session)
     return out
 
 
 @router.get("/businesses/{business_id}")
 async def get_business(ctx: CurrentBusiness, session: DbSession) -> BusinessOut:
-    return BusinessOut.model_validate(await businesses.get_business(session, ctx))
+    return BusinessOut.from_business(await businesses.get_business(session, ctx))
 
 
 @router.patch("/businesses/{business_id}")
 async def update_business(
     ctx: CurrentBusiness, patch: BusinessPatch, session: DbSession
 ) -> BusinessOut:
-    out = BusinessOut.model_validate(await businesses.update_business(session, ctx, patch))
+    out = BusinessOut.from_business(await businesses.update_business(session, ctx, patch))
     await commit(session)
     return out
 
@@ -136,3 +138,27 @@ async def accept_invitation(
     business_id = await invitations.accept(session, principal, data.token)
     await commit(session)
     return {"business_id": business_id}
+
+
+@router.put("/businesses/{business_id}/logo")
+async def upload_logo(ctx: CurrentBusiness, session: DbSession, file: UploadFile) -> BusinessOut:
+    data = await file.read(branding.MAX_UPLOAD_BYTES + 1)
+    business = await branding.set_logo(session, ctx, data)
+    out = BusinessOut.from_business(business)
+    await commit(session)
+    return out
+
+
+@router.delete("/businesses/{business_id}/logo", status_code=204)
+async def delete_logo(ctx: CurrentBusiness, session: DbSession) -> None:
+    await branding.remove_logo(session, ctx)
+    await commit(session)
+
+
+@router.get("/businesses/{business_id}/logo")
+async def get_logo(ctx: CurrentBusiness, session: DbSession) -> Response:
+    business = await businesses.get_business(session, ctx)
+    data = await branding.load_file(session, business.logo_file_id)
+    if data is None:
+        raise NotFound("No logo", code="logo_not_found")
+    return Response(data, media_type="image/png", headers={"Cache-Control": "private, no-cache"})

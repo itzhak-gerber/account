@@ -15,6 +15,7 @@ import { useSession } from "../auth/context";
 import { can } from "../auth/permissions";
 import { AuditTab } from "../features/settings/AuditTab";
 import { BusinessForm } from "../features/settings/BusinessForm";
+import { LogoCard } from "../features/settings/LogoCard";
 import { NumberingTab } from "../features/settings/NumberingTab";
 import { TeamTab } from "../features/settings/TeamTab";
 import { errorMessage } from "../lib/errors";
@@ -63,6 +64,7 @@ export function SettingsPage() {
         ))}
       </Tabs>
 
+      {tab === "details" && <LogoCard business={business} canEdit={can(role, "manageBusiness")} />}
       {tab === "details" && (
         <Card variant="outlined">
           <CardContent>

@@ -81,6 +81,13 @@ class BusinessOut(BaseModel):
     phone: str
     email: str
     default_currency: str
+    has_logo: bool = False
+
+    @classmethod
+    def from_business(cls, business: object) -> "BusinessOut":
+        out = cls.model_validate(business)
+        out.has_logo = getattr(business, "logo_file_id", None) is not None
+        return out
 
 
 class MembershipOut(BaseModel):

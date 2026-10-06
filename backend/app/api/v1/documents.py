@@ -54,6 +54,7 @@ async def list_documents(
     q: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    open_only: bool = False,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[DocumentSummary]:
@@ -66,6 +67,7 @@ async def list_documents(
         q=q,
         date_from=date_from,
         date_to=date_to,
+        open_only=open_only,
         limit=limit,
         offset=offset,
     )

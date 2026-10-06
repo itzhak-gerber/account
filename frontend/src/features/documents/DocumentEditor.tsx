@@ -31,10 +31,11 @@ import type {
 import { useSession } from "../../auth/context";
 import { can } from "../../auth/permissions";
 import { errorMessage } from "../../lib/errors";
-import { formatMoney, previewTotals } from "../../lib/money";
+import { formatDate, formatMoney, previewTotals } from "../../lib/money";
+import { AllocationsEditor } from "./AllocationsEditor";
 import { CustomerPicker } from "./CustomerPicker";
 import { pdfUrl } from "./hooks";
-import { EMPTY_LINE, israelToday } from "./helpers";
+import { EMPTY_LINE, israelToday, type AllocationRow } from "./helpers";
 import { LinesEditor } from "./LinesEditor";
 import { PaymentsEditor } from "./PaymentsEditor";
 
@@ -56,10 +57,51 @@ interface EditorState {
   prices_include_vat: boolean;
   lines: LineInput[];
   payments: PaymentInput[];
+  allocations: AllocationRow[];
   notes: string;
 }
 
-function stateFrom(doc: InvoiceDocument | null, info: DocumentTypeInfo): EditorState {
+function allocationLabel(
+  t: (key: string) => string,
+  a: { invoice_type: string; invoice_number: number | null; invoice_date: string },
+) {
+  return `${t(`docTypes.${a.invoice_type}`)} ${t("documents.number")} ${a.invoice_number} · ${formatDate(a.invoice_date)}`;
+}
+
+function stateFrom(
+  doc: InvoiceDocument | null,
+  info: DocumentTypeInfo,
+  t: (key: string) => string,
+  payInvoice?: InvoiceDocument | null,
+): EditorState {
+  if (!doc && payInvoice) {
+    // A receipt started from an unpaid invoice: same customer, that invoice, its open balance.
+    const balance = payInvoice.balance_due ?? payInvoice.total;
+    return {
+      issue_date: israelToday(),
+      due_date: null,
+      customer_id: payInvoice.customer_id,
+      customer: { ...EMPTY_CUSTOMER, ...payInvoice.customer },
+      prices_include_vat: false,
+      lines: [],
+      payments: [
+        { method: "bank_transfer", amount: balance, payment_date: israelToday(), details: {} },
+      ],
+      allocations: [
+        {
+          invoice_id: payInvoice.id,
+          amount: balance,
+          balance,
+          label: allocationLabel(t, {
+            invoice_type: payInvoice.type,
+            invoice_number: payInvoice.number,
+            invoice_date: payInvoice.issue_date,
+          }),
+        },
+      ],
+      notes: "",
+    };
+  }
   if (!doc) {
     return {
       issue_date: israelToday(),
@@ -69,6 +111,7 @@ function stateFrom(doc: InvoiceDocument | null, info: DocumentTypeInfo): EditorS
       prices_include_vat: false,
       lines: info.has_lines ? [{ ...EMPTY_LINE }] : [],
       payments: [],
+      allocations: [],
       notes: "",
     };
   }
@@ -93,6 +136,12 @@ function stateFrom(doc: InvoiceDocument | null, info: DocumentTypeInfo): EditorS
       payment_date: p.payment_date,
       details: p.details,
     })),
+    allocations: doc.allocations.map((a) => ({
+      invoice_id: a.invoice_id,
+      amount: a.amount,
+      balance: a.balance_due,
+      label: allocationLabel(t, a),
+    })),
     notes: doc.notes,
   };
 }
@@ -110,6 +159,7 @@ function toPayload(state: EditorState) {
         discount_percent: l.discount_percent || "0",
       })),
     payments: state.payments.filter((p) => Number(p.amount) > 0),
+    allocations: state.allocations.map((a) => ({ invoice_id: a.invoice_id, amount: a.amount })),
   };
 }
 
@@ -118,14 +168,15 @@ interface Props {
   type: DocumentType;
   info: DocumentTypeInfo;
   document: InvoiceDocument | null;
+  payInvoice?: InvoiceDocument | null;
 }
 
-export function DocumentEditor({ businessId, type, info, document }: Props) {
+export function DocumentEditor({ businessId, type, info, document, payInvoice }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { current } = useSession();
-  const [state, setState] = useState<EditorState>(() => stateFrom(document, info));
+  const [state, setState] = useState<EditorState>(() => stateFrom(document, info, t, payInvoice));
   const [docId, setDocId] = useState<string | null>(document?.id ?? null);
   const [confirmIssue, setConfirmIssue] = useState(false);
   const base = `/businesses/${businessId}/documents`;
@@ -272,6 +323,32 @@ export function DocumentEditor({ businessId, type, info, document }: Props) {
             onChange={(lines) => setState((s) => ({ ...s, lines }))}
           />
         </Box>
+      )}
+
+      {type === "receipt" && (
+        <AllocationsEditor
+          businessId={businessId}
+          customerId={state.customer_id}
+          rows={state.allocations}
+          paymentsTotal={paid}
+          onChange={(allocations) => setState((s) => ({ ...s, allocations }))}
+          onFillPayment={(amount) =>
+            setState((s) => ({
+              ...s,
+              payments:
+                s.payments.length === 0
+                  ? [
+                      {
+                        method: "bank_transfer",
+                        amount: amount.toFixed(2),
+                        payment_date: s.issue_date,
+                        details: {},
+                      },
+                    ]
+                  : s.payments.map((p, i) => (i === 0 ? { ...p, amount: amount.toFixed(2) } : p)),
+            }))
+          }
+        />
       )}
 
       {info.has_payments && (

@@ -17,8 +17,11 @@ export function DocumentPage() {
   const types = useDocumentTypes(businessId);
   const isNew = documentId === "new";
   const document = useDocument(businessId, isNew ? undefined : documentId);
+  const payInvoiceId = isNew ? (params.get("invoice") ?? undefined) : undefined;
+  const payInvoice = useDocument(businessId, payInvoiceId);
 
-  if (types.isPending || (!isNew && document.isPending)) return <CircularProgress />;
+  if (types.isPending || (!isNew && document.isPending) || (payInvoiceId && payInvoice.isPending))
+    return <CircularProgress />;
   if (!isNew && !document.data) return <>{t("errors.document_not_found")}</>;
 
   const type = (isNew ? params.get("type") : document.data!.type) as DocumentType;
@@ -35,6 +38,7 @@ export function DocumentPage() {
       type={type}
       info={info}
       document={isNew ? null : document.data!}
+      payInvoice={payInvoice.data ?? null}
     />
   );
 }

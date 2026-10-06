@@ -25,6 +25,7 @@ import { can } from "../../auth/permissions";
 import { errorMessage } from "../../lib/errors";
 import { formatDate, formatMoney } from "../../lib/money";
 import { pdfUrl } from "./hooks";
+import { PaymentChip } from "./PaymentChip";
 
 const CONVERSIONS: Partial<Record<DocumentType, DocumentType[]>> = {
   quote: ["tax_invoice", "tax_invoice_receipt", "proforma_invoice"],
@@ -63,6 +64,7 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
           {doc.title} {t("documents.number")} {doc.number}
         </Typography>
         <Chip color="success" variant="outlined" label={t("docStatus.issued")} />
+        {doc.payment_status && <PaymentChip status={doc.payment_status} />}
       </Stack>
       {derive.isError && <Alert severity="error">{errorMessage(t, derive.error)}</Alert>}
 
@@ -96,6 +98,18 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
               {t("view.convertTo", { type: t(`docTypes.${target}`) })}
             </Button>
           ))}
+        {canEdit &&
+          doc.payment_status &&
+          doc.payment_status !== "paid" &&
+          ["tax_invoice", "proforma_invoice"].includes(doc.type) && (
+            <Button
+              variant="outlined"
+              color="success"
+              onClick={() => void navigate(`/documents/new?type=receipt&invoice=${doc.id}`)}
+            >
+              {t("view.issueReceipt")}
+            </Button>
+          )}
         {canEdit && ["tax_invoice", "tax_invoice_receipt"].includes(doc.type) && (
           <Button
             variant="outlined"
@@ -236,6 +250,26 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
               {formatMoney(doc.total)}
             </Typography>
           </Stack>
+          {doc.balance_due !== null && doc.type !== "tax_invoice_receipt" && (
+            <>
+              {Number(doc.amount_paid) > 0 && (
+                <Stack direction="row" sx={{ justifyContent: "space-between" }}>
+                  <Typography>{t("view.paid")}</Typography>
+                  <Typography>{formatMoney(doc.amount_paid)}</Typography>
+                </Stack>
+              )}
+              {Number(doc.amount_credited) > 0 && (
+                <Stack direction="row" sx={{ justifyContent: "space-between" }}>
+                  <Typography>{t("view.credited")}</Typography>
+                  <Typography>{formatMoney(doc.amount_credited)}</Typography>
+                </Stack>
+              )}
+              <Stack direction="row" sx={{ justifyContent: "space-between" }}>
+                <Typography sx={{ fontWeight: 500 }}>{t("view.balance")}</Typography>
+                <Typography sx={{ fontWeight: 500 }}>{formatMoney(doc.balance_due)}</Typography>
+              </Stack>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -254,6 +288,7 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
                   {t(`docTypes.${r.type}`)}{" "}
                   {r.number ? `${t("documents.number")} ${r.number}` : `(${t("docStatus.draft")})`}
                 </Link>
+                {r.amount && ` · ${formatMoney(r.amount)}`}
               </Typography>
             ))}
           </CardContent>

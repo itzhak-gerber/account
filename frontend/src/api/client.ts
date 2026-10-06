@@ -18,13 +18,14 @@ export function setCsrfToken(token: string | null) {
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const isForm = body instanceof FormData;
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (method !== "GET" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
   const response = await fetch(path.startsWith("/auth/") ? path : `/api/v1${path}`, {
     method,
     credentials: "same-origin",
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   });
   if (response.status === 204) return undefined as T;
   const data: unknown = await response.json().catch(() => null);
@@ -43,6 +44,12 @@ export const api = {
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
   put: <T>(path: string, body: unknown) => request<T>("PUT", path, body),
   delete: (path: string) => request<void>("DELETE", path),
+  /** Multipart upload of a single file in the "file" field. */
+  upload: <T>(path: string, file: File, method = "PUT") => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<T>(method, path, form);
+  },
 };
 
 /** Kept for existing callers. */

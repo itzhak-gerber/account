@@ -25,3 +25,11 @@ export const EMPTY_LINE: LineInput = {
   discount_percent: "0",
   vat_type: "standard",
 };
+
+/** A receipt's allocation as edited in the form (label/balance are display-only). */
+export interface AllocationRow {
+  invoice_id: string;
+  amount: string;
+  balance: string;
+  label: string;
+}

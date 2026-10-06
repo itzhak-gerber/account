@@ -145,7 +145,9 @@
       "document.draft_deleted": "מחיקת טיוטה",
       "document.issued": "הפקת מסמך",
       "document.original_delivered": "הפקת מקור PDF",
-      "numbering.changed": "שינוי מספור"
+      "numbering.changed": "שינוי מספור",
+      "business.logo_changed": "עדכון לוגו",
+      "business.logo_removed": "הסרת לוגו"
     }
   },
   "profile": {
@@ -195,7 +197,15 @@
     "payments_not_allowed": "למסמך זה אין תשלומים.",
     "customer_not_found": "הלקוח לא נמצא.",
     "item_not_found": "הפריט לא נמצא.",
-    "document_not_found": "המסמך לא נמצא."
+    "document_not_found": "המסמך לא נמצא.",
+    "allocation_exceeds_balance": "הסכום לחשבונית גבוה מהיתרה הפתוחה שלה.",
+    "allocations_exceed_receipt": "סכום החשבוניות גבוה מסכום הקבלה.",
+    "allocation_invalid_invoice": "ניתן לשייך רק חשבוניות שהופקו.",
+    "allocation_duplicate": "אותה חשבונית נבחרה פעמיים.",
+    "allocation_customer_mismatch": "החשבונית שייכת ללקוח אחר.",
+    "allocations_not_allowed": "רק קבלה יכולה לשלם חשבוניות.",
+    "invalid_image": "הקובץ אינו תמונה תקינה (PNG או JPG).",
+    "image_too_large": "התמונה גדולה מדי (עד 2MB)."
   },
   "common": {
     "comingSoon": "בקרוב",
@@ -283,7 +293,8 @@
     "total": "סכום",
     "chooseType": "איזה מסמך להפיק?",
     "recent": "מסמכים אחרונים",
-    "viewAll": "לכל המסמכים"
+    "viewAll": "לכל המסמכים",
+    "unpaidOnly": "לא שולמו"
   },
   "editor": {
     "newTitle": "{{type}} חדשה",
@@ -349,12 +360,44 @@
     "relation_credits": "זיכוי עבור",
     "relation_converted_from_in": "הומר ל",
     "relation_credits_in": "זוכה ב",
-    "draftBanner": "זוהי טיוטה. היא אינה מסמך תקף עד להפקתה."
+    "draftBanner": "זוהי טיוטה. היא אינה מסמך תקף עד להפקתה.",
+    "issueReceipt": "הפקת קבלה",
+    "paid": "שולם",
+    "credited": "זוכה",
+    "balance": "יתרה לתשלום",
+    "paysFor": "תשלום עבור",
+    "relation_pays": "תשלום עבור",
+    "relation_pays_in": "שולם בקבלה"
   },
   "numbering": {
     "title": "מספור מסמכים",
     "help": "אפשר להמשיך את המספור מהתוכנה הקודמת, רק לפני שהופק המסמך הראשון מאותו סוג.",
     "next": "המספר הבא",
     "save": "עדכון"
+  },
+  "logo": {
+    "title": "לוגו העסק",
+    "help": "PNG או JPG, עד 2MB. הלוגו יופיע בראש המסמכים שיופקו מעכשיו; מסמכים שכבר הופקו נשארים עם הלוגו שהיה בעת ההפקה.",
+    "upload": "העלאת לוגו",
+    "replace": "החלפת לוגו",
+    "remove": "הסרת לוגו",
+    "none": "לא הועלה לוגו",
+    "saved": "הלוגו נשמר"
+  },
+  "paymentStatus": {
+    "unpaid": "לא שולם",
+    "partial": "שולם חלקית",
+    "paid": "שולם"
+  },
+  "allocations": {
+    "title": "החשבוניות שהקבלה משלמת",
+    "help": "בחרו חשבוניות פתוחות; הסכום מתמלא לפי היתרה וניתן לשנותו.",
+    "pick": "בחירת חשבונית פתוחה",
+    "none": "אין חשבוניות פתוחות ללקוח זה",
+    "balance": "יתרה",
+    "amount": "סכום לחשבונית זו",
+    "total": "סה״כ לחשבוניות",
+    "fillPayment": "עדכון סכום התשלום לפי החשבוניות",
+    "unallocated": "סכום שלא שויך לחשבונית: {{amount}}"
   }
 }

@@ -56,6 +56,9 @@ class Business(IdMixin, TimestampMixin, Base):
     phone: Mapped[str] = mapped_column(String(30), default="")
     email: Mapped[str] = mapped_column(String(254), default="")
     default_currency: Mapped[str] = mapped_column(String(3), default="ILS")
+    logo_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("files.id", use_alter=True, name="fk_businesses_logo_file_id_files")
+    )
     settings: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
 
 

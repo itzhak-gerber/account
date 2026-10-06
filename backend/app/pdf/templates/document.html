@@ -19,6 +19,7 @@
   .ltr { direction: ltr; unicode-bidi: embed; }
   header { display: flex; justify-content: space-between; align-items: flex-start;
            border-bottom: 2px solid #1e4fd8; padding-bottom: 8mm; margin-bottom: 6mm; }
+  .logo { display: block; max-height: 22mm; max-width: 60mm; margin-bottom: 3mm; }
   .business h1 { font-size: 16pt; margin: 0 0 2mm; color: #1e4fd8; }
   .business div { color: #374151; line-height: 1.5; }
   .doc-title { text-align: left; }
@@ -47,6 +48,7 @@
 {% if variant == "draft" %}<div class="watermark">טיוטה</div>{% endif %}
 <header>
   <div class="business">
+    {% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}
     <h1>{{ business.display_name }}</h1>
     <div>{{ business.legal_name }}</div>
     <div>{{ tax_id_label }} <span class="ltr">{{ business.tax_id }}</span></div>

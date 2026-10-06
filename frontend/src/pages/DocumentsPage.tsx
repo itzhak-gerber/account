@@ -23,13 +23,14 @@ export function DocumentsPage() {
   const businessId = current!.business.id;
   const types = useDocumentTypes(businessId);
   const [type, setType] = useState<DocumentType | "">("");
-  const [status, setStatus] = useState<DocumentStatus | "">("");
+  const [status, setStatus] = useState<DocumentStatus | "" | "unpaid">("");
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search);
 
   const params = new URLSearchParams({ limit: "100" });
   if (type) params.set("type", type);
-  if (status) params.set("status", status);
+  if (status === "unpaid") params.set("open_only", "true");
+  else if (status) params.set("status", status);
   if (q) params.set("q", q);
   const documents = useQuery({
     queryKey: ["business", businessId, "documents", params.toString()],
@@ -77,12 +78,13 @@ export function DocumentsPage() {
         <ToggleButtonGroup
           exclusive
           value={status}
-          onChange={(_, value: DocumentStatus | "" | null) => setStatus(value ?? "")}
+          onChange={(_, value: DocumentStatus | "" | "unpaid" | null) => setStatus(value ?? "")}
           size="small"
         >
           <ToggleButton value="">{t("documents.allStatuses")}</ToggleButton>
           <ToggleButton value="issued">{t("docStatus.issued")}</ToggleButton>
           <ToggleButton value="draft">{t("docStatus.draft")}</ToggleButton>
+          <ToggleButton value="unpaid">{t("documents.unpaidOnly")}</ToggleButton>
         </ToggleButtonGroup>
       </Stack>
       <DocumentList documents={documents.data} empty={t("documents.empty")} />
