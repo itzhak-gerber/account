@@ -59,6 +59,8 @@ services:
       INVOICE_WEB_CLIENT_SECRET: ${INVOICE_WEB_CLIENT_SECRET:-dev-only-web-secret}
     ports: ["8080:8080"]
     volumes:
+      # Keeps users, passwords and two-factor setups across restarts.
+      - keycloak-data:/opt/keycloak/data
       - ./infra/keycloak/realm-invoice.dev.json:/opt/keycloak/data/import/realm-invoice.json:ro
       - ./infra/keycloak/themes/invoice:/opt/keycloak/themes/invoice:ro
     depends_on: [mailpit]
@@ -107,3 +109,4 @@ services:
 volumes:
   postgres-data:
   files-data:
+  keycloak-data:
