@@ -86,6 +86,7 @@ function issuedDoc(id: string) {
     amount_credited: "0.00",
     balance_due: "1180.00",
     allocations: [],
+    deliveries: [],
     lines: [],
     payments: [],
     related: [],
@@ -190,6 +191,62 @@ describe("DocumentEditor", () => {
       customer: { name: "לקוח" },
       allocations: [{ invoice_id: "inv1", amount: "500" }],
       payments: [{ method: "bank_transfer", amount: "1180.00" }],
+    });
+  });
+
+  it("emails an issued document with the default recipient plus a typed one", async () => {
+    const calls: { method: string; url: string; body: unknown }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+        if (url === "/api/v1/me") return json(ME);
+        if (url.endsWith("/document-types")) return json(TYPES);
+        if (url.endsWith("/email-defaults"))
+          return json({
+            to: ["billing@client.example"],
+            subject: "חשבונית מס מס׳ 1",
+            message: "שלום",
+          });
+        if (method === "POST" && url.endsWith("/send-email"))
+          return json(
+            {
+              id: "e1",
+              recipients: [],
+              subject: "",
+              variant: "original",
+              status: "queued",
+              error: null,
+              sent_at: null,
+              created_at: "",
+            },
+            202,
+          );
+        if (url.endsWith("/documents/d1")) return json(issuedDoc("d1"));
+        return json([]);
+      }),
+    );
+    render(
+      <MemoryRouter initialEntries={["/documents/d1"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "שליחה במייל" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("billing@client.example")).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText(/נמענים/), "boss@client.example");
+    await user.click(within(dialog).getByRole("button", { name: "שליחה" }));
+
+    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith("/send-email"))).toBe(true));
+    const post = calls.find((c) => c.url.endsWith("/send-email"));
+    expect(post?.body).toEqual({
+      to: ["billing@client.example", "boss@client.example"],
+      subject: "חשבונית מס מס׳ 1",
+      message: "שלום",
     });
   });
 });

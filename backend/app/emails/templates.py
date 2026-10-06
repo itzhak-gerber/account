@@ -22,13 +22,19 @@ class Email:
     text: str
 
 
-def _layout(body_html: str) -> str:
+def _layout(body_html: str, *, logo_cid: str | None = None) -> str:
     return (
         '<!doctype html><html lang="he" dir="rtl"><body style="margin:0;background:#f5f7fb;'
         'font-family:Arial,sans-serif;color:#1f2937">'
         '<div style="max-width:560px;margin:24px auto;background:#fff;border-radius:10px;'
         'padding:24px;text-align:right">'
-        f"{body_html}"
+        + (
+            f'<img src="cid:{logo_cid}" alt="" style="max-height:70px;max-width:220px;'
+            'margin-bottom:16px">'
+            if logo_cid
+            else ""
+        )
+        + f"{body_html}"
         '<p style="color:#6b7280;font-size:12px;margin-top:32px">'
         "הודעה זו נשלחה אוטומטית ממערכת חשבוניות.</p></div></body></html>"
     )
@@ -53,3 +59,33 @@ def invitation_email(
         f"לקבלת ההזמנה: {link}\nההזמנה בתוקף ל-{ttl_days} ימים."
     )
     return Email(to=to, subject=subject, html=html, text=text)
+
+
+def document_email(
+    *,
+    to: list[str],
+    subject: str,
+    message: str,
+    business_name: str,
+    title: str,
+    number: int,
+    total: str,
+    logo_cid: str | None,
+) -> tuple[str, str]:
+    """HTML and plain-text bodies for a document sent to a customer."""
+    paragraphs = "".join(
+        f'<p style="margin:0 0 12px">{escape(p).replace(chr(10), "<br>")}</p>'
+        for p in message.split("\n\n")
+        if p.strip()
+    )
+    html = _layout(
+        f"{paragraphs}"
+        '<div style="background:#f5f7fb;border-radius:8px;padding:12px 16px;margin-top:16px">'
+        f"<strong>{escape(title)} מס׳ {number}</strong><br>"
+        f"סה״כ: {escape(total)} ₪<br>"
+        '<span style="color:#6b7280">המסמך מצורף כקובץ PDF.</span></div>'
+        f'<p style="color:#6b7280;margin-top:24px">{escape(business_name)}</p>',
+        logo_cid=logo_cid,
+    )
+    text = f"{message}\n\n{title} מס׳ {number} – סה״כ {total} ₪ (מצורף כקובץ PDF)\n{business_name}"
+    return html, text

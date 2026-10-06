@@ -50,6 +50,9 @@ You can also register new users from the login page; the verification email arri
 7. **Receipts pay invoices**: in a receipt, pick open invoices (the amount fills in with the open
    balance and can be changed), or press **הפקת קבלה** on an unpaid invoice. Invoices then show
    paid / partly paid, and the documents list has a **לא שולמו** (unpaid) filter.
+8. **שליחה במייל** on an issued document: emails it to the customer with the PDF attached.
+   The document page shows each send and whether it went out. In development every email
+   lands in Mailpit at http://localhost:8025 instead of a real inbox.
 
 ### Connecting an AI assistant (MCP)
 

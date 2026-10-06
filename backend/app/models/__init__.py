@@ -4,7 +4,9 @@ from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.catalog import Customer, Item, ItemType, VatType
 from app.models.documents import (
+    DeliveryStatus,
     Document,
+    DocumentDelivery,
     DocumentLine,
     DocumentPayment,
     DocumentRelation,
@@ -26,7 +28,9 @@ __all__ = [
     "BusinessMember",
     "BusinessType",
     "Customer",
+    "DeliveryStatus",
     "Document",
+    "DocumentDelivery",
     "DocumentLine",
     "DocumentPayment",
     "DocumentRelation",

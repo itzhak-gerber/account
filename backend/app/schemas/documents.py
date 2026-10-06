@@ -161,6 +161,7 @@ class DocumentOut(BaseModel):
     amount_credited: Decimal
     balance_due: Decimal | None
     allocations: list[AllocationOut]
+    deliveries: list["DeliveryOut"]
     lines: list[LineOut]
     payments: list[PaymentOut]
     related: list[RelatedDocument]
@@ -204,3 +205,30 @@ class DocumentTypeInfo(BaseModel):
     is_tax_document: bool
     shows_vat: bool
     has_due_date: bool
+
+
+class EmailRequest(BaseModel):
+    to: Annotated[list[EmailStr], Field(min_length=1, max_length=5)]
+    subject: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
+    message: Annotated[str, StringConstraints(max_length=4000)] = ""
+
+
+class EmailDefaults(BaseModel):
+    to: list[str]
+    subject: str
+    message: str
+
+
+class DeliveryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    recipients: list[str]
+    subject: str
+    variant: str
+    status: str
+    error: str | None
+    sent_at: datetime | None
+    created_at: datetime
+
+
+DocumentOut.model_rebuild()

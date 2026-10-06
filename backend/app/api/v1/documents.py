@@ -11,15 +11,18 @@ from app.core.db import commit
 from app.models import Business, BusinessType, DocumentStatus, DocumentType
 from app.schemas.documents import (
     ConvertIn,
+    DeliveryOut,
     DocumentIn,
     DocumentOut,
     DocumentPatch,
     DocumentSummary,
     DocumentTypeInfo,
+    EmailDefaults,
+    EmailRequest,
     NumberingIn,
     NumberingOut,
 )
-from app.services import audit, documents, numbering
+from app.services import audit, delivery, documents, numbering
 from app.services.document_rules import RULES, allowed_types
 from app.services.permissions import Permission, require
 
@@ -175,5 +178,21 @@ async def set_numbering(
         changes={"type": data.type, "next_number": data.next_number},
     )
     out = NumberingOut(next_numbers=await numbering.peek(session, ctx.business_id))
+    await commit(session)
+    return out
+
+
+@router.get("/documents/{document_id}/email-defaults")
+async def email_defaults(
+    ctx: CurrentBusiness, document_id: uuid.UUID, session: DbSession
+) -> EmailDefaults:
+    return await delivery.defaults(session, ctx, document_id)
+
+
+@router.post("/documents/{document_id}/send-email", status_code=202)
+async def send_email(
+    ctx: CurrentBusiness, document_id: uuid.UUID, data: EmailRequest, session: DbSession
+) -> DeliveryOut:
+    out = DeliveryOut.model_validate(await delivery.send(session, ctx, document_id, data))
     await commit(session)
     return out

@@ -1,3 +1,4 @@
+import MailOutlined from "@mui/icons-material/MailOutlined";
 import PictureAsPdfOutlined from "@mui/icons-material/PictureAsPdfOutlined";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
@@ -15,6 +16,7 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink, useNavigate } from "react-router";
 
@@ -26,6 +28,7 @@ import { errorMessage } from "../../lib/errors";
 import { formatDate, formatMoney } from "../../lib/money";
 import { pdfUrl } from "./hooks";
 import { PaymentChip } from "./PaymentChip";
+import { SendEmailDialog } from "./SendEmailDialog";
 
 const CONVERSIONS: Partial<Record<DocumentType, DocumentType[]>> = {
   quote: ["tax_invoice", "tax_invoice_receipt", "proforma_invoice"],
@@ -39,6 +42,7 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
   const { current } = useSession();
   const base = `/businesses/${businessId}/documents/${doc.id}`;
   const canEdit = can(current?.role, "editDocuments");
+  const [emailing, setEmailing] = useState(false);
   const vatRegistered = ["licensed_dealer", "company"].includes(current!.business.business_type);
 
   const derive = useMutation({
@@ -98,6 +102,11 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
               {t("view.convertTo", { type: t(`docTypes.${target}`) })}
             </Button>
           ))}
+        {canEdit && (
+          <Button variant="outlined" startIcon={<MailOutlined />} onClick={() => setEmailing(true)}>
+            {t("email.send")}
+          </Button>
+        )}
         {canEdit &&
           doc.payment_status &&
           doc.payment_status !== "paid" &&
@@ -272,6 +281,46 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
           )}
         </CardContent>
       </Card>
+
+      {doc.deliveries.length > 0 && (
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="h6" component="h2">
+              {t("email.history")}
+            </Typography>
+            {doc.deliveries.map((d) => (
+              <Stack
+                key={d.id}
+                direction="row"
+                spacing={1}
+                sx={{ alignItems: "center", py: 0.5, flexWrap: "wrap" }}
+              >
+                <Chip
+                  size="small"
+                  label={t(`email.status.${d.status}`)}
+                  color={
+                    d.status === "sent" ? "success" : d.status === "failed" ? "error" : "default"
+                  }
+                />
+                <Typography dir="ltr">{d.recipients.join(", ")}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {new Date(d.sent_at ?? d.created_at).toLocaleString("he-IL")} ·{" "}
+                  {t(`email.variant.${d.variant}`)}
+                </Typography>
+              </Stack>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {emailing && (
+        <SendEmailDialog
+          businessId={businessId}
+          documentId={doc.id}
+          originalSent={Boolean(doc.original_delivered_at)}
+          onClose={() => setEmailing(false)}
+        />
+      )}
 
       {doc.notes && <Typography sx={{ whiteSpace: "pre-wrap" }}>{doc.notes}</Typography>}
 

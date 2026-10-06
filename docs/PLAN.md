@@ -5,7 +5,7 @@ invoices, receipts, and related documents. It has a Hebrew (RTL) responsive UI,
 a FastAPI backend, PostgreSQL, and a built-in MCP server so AI agents can work
 with the same data under the same security rules.
 
-> Status: **approved. M0, M1a, M2 and M3 done; next: M1b (Azure dev environment) or M4**. Decisions are recorded in [§14](#14-decisions-log).
+> Status: **approved. M0, M1a, M2, M3 and M4 done; next: M7 (reports), then M1b (Azure)**. Decisions are recorded in [§14](#14-decisions-log).
 
 ---
 
@@ -410,7 +410,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M1b** | Azure dev environment | Terraform for Azure (Container Apps, PostgreSQL Flexible Server, Blob Storage for PDFs, Key Vault, Static Web Apps), GitHub Actions deploy with OIDC federation, production Keycloak realm (no dev users / password-grant client), OAuth scopes + dynamic client registration for MCP clients, budget alert |
 | **M2** ✅ | Catalog | Customers and items: CRUD, search, UI, MCP tools |
 | **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
-| **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links; remaining: email sending to customers |
+| **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links, documents emailed to customers (PDF attached, logo inline, retries, delivery history) |
 | **M5** | Notifications | In-app inbox, PWA + Web Push to phones, email notifications, preferences screen, MCP tools |
 | **M6** | Israeli compliance | OPENFRMT export; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
 | **M7** | Reports and dashboard | Revenue/VAT per period, open balances, CSV/Excel export, MCP `get_report` |

@@ -147,7 +147,8 @@
       "document.original_delivered": "הפקת מקור PDF",
       "numbering.changed": "שינוי מספור",
       "business.logo_changed": "עדכון לוגו",
-      "business.logo_removed": "הסרת לוגו"
+      "business.logo_removed": "הסרת לוגו",
+      "document.emailed": "שליחת מסמך במייל"
     }
   },
   "profile": {
@@ -205,7 +206,8 @@
     "allocation_customer_mismatch": "החשבונית שייכת ללקוח אחר.",
     "allocations_not_allowed": "רק קבלה יכולה לשלם חשבוניות.",
     "invalid_image": "הקובץ אינו תמונה תקינה (PNG או JPG).",
-    "image_too_large": "התמונה גדולה מדי (עד 2MB)."
+    "image_too_large": "התמונה גדולה מדי (עד 2MB).",
+    "document_not_issued": "רק מסמך שהופק ניתן לשליחה."
   },
   "common": {
     "comingSoon": "בקרוב",
@@ -399,5 +401,27 @@
     "total": "סה״כ לחשבוניות",
     "fillPayment": "עדכון סכום התשלום לפי החשבוניות",
     "unallocated": "סכום שלא שויך לחשבונית: {{amount}}"
+  },
+  "email": {
+    "send": "שליחה במייל",
+    "title": "שליחת המסמך במייל",
+    "to": "נמענים",
+    "toHelp": "ניתן להוסיף עד 5 כתובות; Enter אחרי כל כתובת",
+    "subject": "נושא",
+    "message": "הודעה",
+    "submit": "שליחה",
+    "sentOk": "המייל נשלח לתור השליחה",
+    "history": "משלוחים",
+    "status": {
+      "queued": "בתור",
+      "sent": "נשלח",
+      "failed": "נכשל"
+    },
+    "variant": {
+      "original": "מקור",
+      "copy": "העתק"
+    },
+    "noRecipients": "יש להזין לפחות כתובת אחת",
+    "originalNote": "המייל הראשון יישלח עם ״מקור״ המסמך; הבאים עם ״העתק נאמן למקור״."
   }
 }

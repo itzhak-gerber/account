@@ -213,6 +213,7 @@ export interface InvoiceDocument {
   amount_credited: string;
   balance_due: string | null;
   allocations: Allocation[];
+  deliveries: Delivery[];
   lines: (LineInput & { id: string; line_total: string })[];
   payments: (PaymentInput & { id: string })[];
   related: RelatedDocument[];
@@ -232,4 +233,21 @@ export interface DocumentSummary {
   payment_status: PaymentStatus | null;
   balance_due: string | null;
   created_at: string;
+}
+
+export interface Delivery {
+  id: string;
+  recipients: string[];
+  subject: string;
+  variant: "original" | "copy";
+  status: "queued" | "sent" | "failed";
+  error: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface EmailDefaults {
+  to: string[];
+  subject: string;
+  message: string;
 }

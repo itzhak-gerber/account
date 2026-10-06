@@ -49,7 +49,7 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF"]
 ignore = ["S101"]
 # Hebrew punctuation (geresh, gershayim) and the en dash are intentional in Hebrew text.
-allowed-confusables = ["׳", "״", "–"]
+allowed-confusables = ["׳", "״", "–", "ו"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S"]

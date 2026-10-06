@@ -17,6 +17,7 @@ from app.models import (
     Business,
     BusinessType,
     Document,
+    DocumentDelivery,
     DocumentLine,
     DocumentPayment,
     DocumentRelation,
@@ -32,6 +33,7 @@ from app.schemas.documents import (
     AllocationIn,
     AllocationOut,
     CustomerDetails,
+    DeliveryOut,
     DocumentIn,
     DocumentOut,
     DocumentPatch,
@@ -371,6 +373,14 @@ async def to_out(session: AsyncSession, document: Document) -> DocumentOut:
         amount_credited=document.amount_credited,
         balance_due=balance,
         allocations=allocations,
+        deliveries=[
+            DeliveryOut.model_validate(d)
+            for d in await session.scalars(
+                select(DocumentDelivery)
+                .where(DocumentDelivery.document_id == document.id)
+                .order_by(DocumentDelivery.created_at.desc())
+            )
+        ],
         lines=[LineOut.model_validate(line) for line in document.lines],
         payments=[PaymentOut.model_validate(p) for p in document.payments],
         related=await related(session, document),

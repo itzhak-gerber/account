@@ -25,9 +25,16 @@ from app.core.db import commit, get_sessionmaker
 from app.core.errors import AppError, NotAuthenticated
 from app.models import DocumentStatus, DocumentType, Role, User
 from app.schemas.catalog import CustomerIn, CustomerOut, ItemIn, ItemOut
-from app.schemas.documents import DocumentIn, DocumentOut, DocumentPatch, DocumentSummary
+from app.schemas.documents import (
+    DeliveryOut,
+    DocumentIn,
+    DocumentOut,
+    DocumentPatch,
+    DocumentSummary,
+    EmailRequest,
+)
 from app.schemas.identity import BusinessOut, MemberOut, UserOut
-from app.services import businesses, catalog, documents
+from app.services import businesses, catalog, delivery, documents
 from app.services.system import SystemStatus, get_system_status
 
 
@@ -274,6 +281,37 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
             await documents.get_document(session, ctx, document_id)
             return document_pdf_link(
                 ctx.principal, business_id, document_id, get_settings().public_url
+            )
+
+    @mcp.tool()
+    async def send_document_email(
+        business_id: uuid.UUID,
+        document_id: uuid.UUID,
+        to: list[str] | None = None,
+        subject: str | None = None,
+        message: str | None = None,
+        confirm: bool = False,
+    ) -> DeliveryOut:
+        """Email an issued document (PDF attached) to the customer. Sends a real email.
+
+        Omitted fields use the defaults (customer's email, standard Hebrew subject/message).
+        Show the user the recipients and text first; call with confirm=true once approved.
+        """
+        async with _business_session(business_id) as (session, ctx):
+            defaults = await delivery.defaults(session, ctx, document_id)
+            request = EmailRequest(
+                to=to or defaults.to,
+                subject=subject or defaults.subject,
+                message=message if message is not None else defaults.message,
+            )
+            if not confirm:
+                raise ToolError(
+                    "confirmation_required: will send to "
+                    f"{', '.join(map(str, request.to))} with subject '{request.subject}'. "
+                    "Call again with confirm=true once the user approves."
+                )
+            return DeliveryOut.model_validate(
+                await delivery.send(session, ctx, document_id, request)
             )
 
     return mcp
