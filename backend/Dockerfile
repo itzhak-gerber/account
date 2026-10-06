@@ -13,7 +13,8 @@ RUN uv sync --frozen --no-dev
 
 FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/opt/venv/bin:$PATH" \
-    APP_STORAGE_DIR=/data/files
+    APP_STORAGE_DIR=/data/files \
+    XDG_CACHE_HOME=/tmp/cache
 # Pango/HarfBuzz for WeasyPrint (Hebrew PDF text shaping). Fonts are bundled with the app.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
