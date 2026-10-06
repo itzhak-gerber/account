@@ -62,8 +62,8 @@ curl -s http://localhost:8080/realms/invoice/protocol/openid-connect/token \
 Owners and admins must use two-factor authentication, so their tokens must come from a login
 that included the one-time code.
 
-To open the app from your phone, connect it to the same Wi-Fi and browse to
-`http://<your-computer's-IP>:5173`.
+The local setup works in a browser on the same computer. Opening it from a phone needs the
+Azure test environment (M1b), because sign-in is tied to `localhost`.
 
 Stop with `Ctrl+C`; `docker compose down -v` also deletes the local database.
 
