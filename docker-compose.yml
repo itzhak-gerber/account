@@ -4,14 +4,21 @@
 # MCP:       http://localhost:8000/mcp/
 # Keycloak:  http://localhost:8080   (admin console: admin / admin)
 # Mailpit:   http://localhost:8025   (catches all emails sent in development)
+#
+# To use the app from a phone on the same Wi-Fi, put this computer's network address in a
+# file named .env next to this one, e.g.  APP_HOST=192.168.1.20  and then open
+# http://192.168.1.20:5173 on both the computer and the phone.
 
 x-backend-env: &backend-env
   APP_ENVIRONMENT: local
   # The app connects as a restricted role so PostgreSQL row-level security applies to it.
   APP_DATABASE_URL: postgresql+asyncpg://invoice_app:${APP_DB_PASSWORD:-invoice_app}@postgres:5432/invoice
   APP_REDIS_URL: redis://redis:6379/0
-  APP_PUBLIC_URL: http://localhost:5173
-  APP_OIDC_ISSUER: http://localhost:8080/realms/invoice
+  APP_PUBLIC_URL: http://${APP_HOST:-localhost}:5173
+  APP_OIDC_ISSUER: http://${APP_HOST:-localhost}:8080/realms/invoice
+  APP_MCP_ALLOWED_HOSTS: '["localhost", "localhost:*", "127.0.0.1:*", "backend:*", "${APP_HOST:-localhost}:*"]'
+  APP_MCP_ALLOWED_ORIGINS: '["http://localhost:*", "http://127.0.0.1:*", "http://${APP_HOST:-localhost}:*"]'
+
   APP_OIDC_INTERNAL_URL: http://keycloak:8080/realms/invoice
   APP_OIDC_CLIENT_SECRET: ${INVOICE_WEB_CLIENT_SECRET:-dev-only-web-secret}
   APP_SMTP_HOST: mailpit
@@ -53,7 +60,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       # Browsers use localhost:8080; the backend reaches Keycloak as keycloak:8080.
-      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME: http://${APP_HOST:-localhost}:8080
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HEALTH_ENABLED: "true"
       INVOICE_WEB_CLIENT_SECRET: ${INVOICE_WEB_CLIENT_SECRET:-dev-only-web-secret}
@@ -68,6 +75,29 @@ services:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
       interval: 5s
       retries: 40
+
+  # Points the login server at the address the app is opened on (localhost or APP_HOST), on
+  # every start, without touching users or two-factor setups.
+  keycloak-setup:
+    image: keycloak/keycloak:26.4
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        kc=/opt/keycloak/bin/kcadm.sh
+        $$kc config credentials --server http://keycloak:8080 --realm master \
+          --user admin --password "$$KEYCLOAK_ADMIN_PASSWORD" --config /tmp/kcadm.config
+        id=$$($$kc get clients -r invoice -q clientId=invoice-web --fields id --format csv \
+          --noquotes --config /tmp/kcadm.config)
+        $$kc update clients/$$id -r invoice --config /tmp/kcadm.config \
+          -s "redirectUris=[\"http://localhost:5173/auth/callback\",\"http://$$APP_HOST:5173/auth/callback\"]" \
+          -s "attributes.\"post.logout.redirect.uris\"=http://localhost:5173/*##http://$$APP_HOST:5173/*"
+        echo "Login server allows http://localhost:5173 and http://$$APP_HOST:5173"
+    environment:
+      APP_HOST: ${APP_HOST:-localhost}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    depends_on:
+      keycloak: { condition: service_healthy }
 
   migrate:
     build: ./backend
@@ -87,7 +117,7 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
-      keycloak: { condition: service_healthy }
+      keycloak-setup: { condition: service_completed_successfully }
 
   worker:
     build: ./backend

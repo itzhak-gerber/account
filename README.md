@@ -66,8 +66,20 @@ curl -s http://localhost:8080/realms/invoice/protocol/openid-connect/token \
 Owners and admins must use two-factor authentication, so their tokens must come from a login
 that included the one-time code.
 
-The local setup works in a browser on the same computer. Opening it from a phone needs the
-Azure test environment (M1b), because sign-in is tied to `localhost`.
+### Use it from a phone on the same Wi-Fi
+
+1. Find this computer's address on the network: on Windows run `ipconfig` and take the
+   "IPv4 Address" of the Wi-Fi adapter (looks like `192.168.1.20`); on Mac, System Settings →
+   Wi-Fi → Details.
+2. In the `account` folder create a file named `.env` containing that address, e.g. in a
+   Windows command prompt: `echo APP_HOST=192.168.1.20>.env`
+3. Restart: `Ctrl+C`, then `docker compose up --build`.
+4. Open **http://192.168.1.20:5173** (your address) on the phone **and** on the computer.
+   Always use this address while `.env` is set; `localhost` sessions do not carry over.
+
+If Windows asks whether to allow Docker on the network, allow it for private networks. If the
+computer's address changes (routers sometimes reassign it), update `.env` and restart. To go
+back to `localhost`, delete `.env` and restart. Away from home, use the Azure environment (M1b).
 
 Stop with `Ctrl+C` (or `docker compose down`). Businesses, customers, documents, PDFs and
 logins (including two-factor setup) are kept in Docker volumes and are there next time.
