@@ -31,6 +31,8 @@ from app.jobs import queue
 from tests.fake_idp import FakeIdP
 
 TABLES = [
+    "notifications",
+    "notification_preferences",
     "outbox_events",
     "document_relations",
     "document_payments",
@@ -75,8 +77,9 @@ def idp() -> FakeIdP:
     return fake
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def sent_jobs(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, dict[str, Any]]]:
+    """Background jobs are recorded, never sent to Redis (every test gets this)."""
     jobs: list[tuple[str, dict[str, Any]]] = []
 
     async def fake_enqueue(function: str, **kwargs: Any) -> None:

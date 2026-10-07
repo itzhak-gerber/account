@@ -8,6 +8,7 @@ import Typography from "@mui/material/Typography";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router";
 
 import { api } from "../api/client";
 import type { Business, BusinessInput } from "../api/types";
@@ -26,7 +27,8 @@ export function SettingsPage() {
   const { t } = useTranslation();
   const { current, refresh } = useSession();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<TabKey>("details");
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<TabKey>(() => (params.get("tab") as TabKey | null) ?? "details");
 
   const save = useMutation({
     mutationFn: (input: BusinessInput) =>

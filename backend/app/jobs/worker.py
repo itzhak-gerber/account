@@ -2,18 +2,24 @@
 
 import base64
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from typing import Any, ClassVar
+from zoneinfo import ZoneInfo
 
 import aiosmtplib
 import structlog
 from arq import Retry
 from arq.connections import RedisSettings
+from arq.cron import cron
+from arq.worker import func
+from sqlalchemy import text, update
 
 from app.core.config import get_settings
-from app.core.db import get_sessionmaker, set_rls_context
-from app.models import DeliveryStatus, DocumentDelivery
+from app.core.db import commit, get_sessionmaker, set_rls_context
+from app.models import DeliveryStatus, Document, DocumentDelivery, OutboxEvent
+from app.services import events, notifications
+from app.services.documents import today
 
 log = structlog.get_logger()
 MAX_TRIES = 5
@@ -51,14 +57,33 @@ async def send_email(ctx: dict[str, Any], *, to: str, subject: str, html: str, t
     log.info("email.sent", subject=subject)
 
 
-async def _record(business_id: str, delivery_id: str, **values: Any) -> None:
+async def _record(
+    business_id: str, delivery_id: str, *, final_failure: bool = False, **values: Any
+) -> None:
     async with get_sessionmaker()() as session:
         await set_rls_context(session, business_id=uuid.UUID(business_id))
         delivery = await session.get(DocumentDelivery, uuid.UUID(delivery_id))
-        if delivery is not None:
-            for key, value in values.items():
-                setattr(delivery, key, value)
-            await session.commit()
+        if delivery is None:
+            return
+        for key, value in values.items():
+            setattr(delivery, key, value)
+        if final_failure:
+            document = await session.get(Document, delivery.document_id)
+            assert document is not None
+            events.emit(
+                session,
+                document.business_id,
+                "document.email_failed",
+                {
+                    "delivery_id": str(delivery.id),
+                    "document_id": str(document.id),
+                    "type": document.type,
+                    "number": document.number,
+                    "to": list(delivery.recipients),
+                    "created_by_user_id": str(delivery.created_by_user_id),
+                },
+            )
+        await commit(session)
 
 
 async def send_document_email(
@@ -103,6 +128,7 @@ async def send_document_email(
             status=DeliveryStatus.FAILED,
             error=str(exc)[:500],
             attempts=attempt,
+            final_failure=attempt >= MAX_TRIES,
         )
         if attempt < MAX_TRIES:
             raise Retry(defer=30 * attempt) from exc
@@ -118,7 +144,93 @@ async def send_document_email(
     log.info("document_email.sent", delivery_id=delivery_id)
 
 
+# --- notifications ---------------------------------------------------------------------
+
+DISPATCH_BATCH = 50
+DISPATCH_LEASE_SECONDS = 300
+DISPATCH_MAX_ATTEMPTS = 5
+
+
+async def _dispatch_one(
+    event_id: uuid.UUID, business_id: uuid.UUID, event_type: str, payload: dict[str, Any]
+) -> None:
+    async with get_sessionmaker()() as session:
+        await set_rls_context(session, business_id=business_id)
+        message = await notifications.message_for(session, event_id, event_type, payload)
+        delivered = 0
+        if message is not None:
+            delivered = await notifications.deliver(session, business_id, message)
+        await session.execute(
+            update(OutboxEvent).where(OutboxEvent.id == event_id).values(status="done")
+        )
+        await commit(session)
+    log.info("outbox.dispatched", event_type=event_type, notified=delivered)
+
+
+async def _mark_failed(event_id: uuid.UUID, business_id: uuid.UUID) -> None:
+    async with get_sessionmaker()() as session:
+        await set_rls_context(session, business_id=business_id)
+        await session.execute(
+            update(OutboxEvent).where(OutboxEvent.id == event_id).values(status="failed")
+        )
+        await session.commit()
+
+
+async def dispatch_outbox(ctx: dict[str, Any]) -> int:
+    """Turn pending domain events into notifications. Safe to run concurrently: events are
+    leased by the database, so each is handled once (and retried if a worker dies)."""
+    handled = 0
+    while True:
+        async with get_sessionmaker()() as session:
+            claimed = (
+                await session.execute(
+                    text("SELECT * FROM claim_outbox_events(:n, :lease)"),
+                    {"n": DISPATCH_BATCH, "lease": DISPATCH_LEASE_SECONDS},
+                )
+            ).all()
+            await session.commit()
+        for event_id, business_id, event_type, payload, attempts in claimed:
+            try:
+                await _dispatch_one(event_id, business_id, event_type, payload)
+            except Exception:
+                log.exception("outbox.dispatch_failed", event_id=str(event_id), attempts=attempts)
+                if attempts >= DISPATCH_MAX_ATTEMPTS:
+                    await _mark_failed(event_id, business_id)
+            handled += 1
+        if len(claimed) < DISPATCH_BATCH:
+            return handled
+
+
+async def raise_overdue_events(ctx: dict[str, Any]) -> int:
+    """Daily: one event per invoice that became overdue in the last week (once each)."""
+    yesterday = today() - timedelta(days=1)
+    async with get_sessionmaker()() as session:
+        count = await session.scalar(
+            text("SELECT enqueue_overdue_events(:since, :until)"),
+            {"since": yesterday - timedelta(days=6), "until": yesterday},
+        )
+        await session.execute(text("SELECT purge_old_notifications()"))
+        await session.commit()
+    log.info("overdue.raised", count=count)
+    if count:
+        await dispatch_outbox(ctx)
+    return int(count or 0)
+
+
 class WorkerSettings:
-    functions: ClassVar[list[Any]] = [ping, send_email, send_document_email]
+    functions: ClassVar[list[Any]] = [
+        ping,
+        send_email,
+        send_document_email,
+        # No stored result, so the next "kick" with the same job id is accepted right away.
+        func(dispatch_outbox, name=events.DISPATCH_JOB, keep_result=0),
+        raise_overdue_events,
+    ]
+    cron_jobs: ClassVar[list[Any]] = [
+        # A safety net for events whose "kick" was lost (e.g. Redis was briefly down).
+        cron(dispatch_outbox, name="dispatch_outbox_sweep", second={0, 30}, run_at_startup=True),
+        cron(raise_overdue_events, hour={8}, minute={5}),  # 08:05 Israel time
+    ]
+    timezone = ZoneInfo(get_settings().timezone)
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     max_tries = MAX_TRIES

@@ -20,6 +20,7 @@ from app.models.documents import (
     VatRate,
 )
 from app.models.identity import Business, BusinessMember, BusinessType, Invitation, Role, User
+from app.models.notifications import Notification, NotificationEvent, NotificationPreference
 
 __all__ = [
     "AuditLog",
@@ -40,6 +41,9 @@ __all__ = [
     "Invitation",
     "Item",
     "ItemType",
+    "Notification",
+    "NotificationEvent",
+    "NotificationPreference",
     "OutboxEvent",
     "PaymentMethod",
     "RelationType",

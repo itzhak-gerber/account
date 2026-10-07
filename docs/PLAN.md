@@ -5,7 +5,7 @@ invoices, receipts, and related documents. It has a Hebrew (RTL) responsive UI,
 a FastAPI backend, PostgreSQL, and a built-in MCP server so AI agents can work
 with the same data under the same security rules.
 
-> Status: **approved. M0, M1a, M2, M3, M4 and M7 done; next: M1b (Azure dev environment)**. Decisions are recorded in [§14](#14-decisions-log).
+> Status: **approved. M0, M1a, M2, M3, M4 and M7 done, M5 in-app part done; next: M1b (Azure dev environment)**. Decisions are recorded in [§14](#14-decisions-log).
 
 ---
 
@@ -320,6 +320,26 @@ outbox_events ──► worker ──► dispatcher (reads notification_preferen
   documents to *customers*.
 - Actions taken via MCP emit the same events, so they notify too.
 
+**Implemented (M5, in-app part):**
+
+| Event | Who is told | Email by default |
+|---|---|---|
+| `payment_received` (receipt / invoice-receipt issued) | owner, admin, accountant | no |
+| `document_issued` (by another user or an AI assistant) | owner, admin | no |
+| `invoice_overdue` (once, the day after the due date or issue date, if still open) | owner, admin, accountant | yes |
+| `email_failed` (a document email gave up after all retries) | the sender | yes |
+| `member_joined` | owner, admin | no |
+
+- The person who caused an event is not notified, unless an AI assistant acted for them.
+- The worker leases outbox events through a database function (`claim_outbox_events`), so
+  several workers never handle one event twice, and a crashed worker's events are retried.
+  A periodic sweep (every 30 s) covers lost wake-ups. The overdue check runs daily at 08:05.
+- Row-level security: a user reads only their own notifications; the worker may write
+  notifications only for members of the business, and cannot read them.
+- Email titles carry no amounts or customer names; details are shown after login.
+- Read notifications are deleted after 180 days, handled events after 30 days.
+- The bell polls every 30 seconds (and on window focus); SSE can replace polling later.
+
 ---
 
 ## 10. Inventory readiness (module planned for later)
@@ -411,7 +431,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M2** ✅ | Catalog | Customers and items: CRUD, search, UI, MCP tools |
 | **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
 | **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links, documents emailed to customers (PDF attached, logo inline, retries, delivery history) |
-| **M5** | Notifications | In-app inbox, PWA + Web Push to phones, email notifications, preferences screen, MCP tools |
+| **M5** | Notifications | ✅ in-app inbox (bell), email notifications, preferences screen, MCP tools, outbox dispatcher, daily overdue check; remaining: PWA + Web Push to phones (needs HTTPS, after M1b), new-device login alert, daily summary |
 | **M6** | Israeli compliance | OPENFRMT export; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
 | **M7** | Reports and dashboard | ✅ income and VAT per period (taxable / zero-rated / exempt), money received by payment method, open balances with aging, Excel export, dashboard figures and 12-month chart, MCP `get_report` |
 | **M8** | Production hardening | Azure staging + production, observability, backups/restore drill, load test, security review and pen test, privacy policy and terms |

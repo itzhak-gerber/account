@@ -17,7 +17,7 @@ from app.emails.templates import invitation_email
 from app.jobs import queue
 from app.models import Business, BusinessMember, Invitation, Role, User
 from app.schemas.identity import InvitationPreview
-from app.services import audit
+from app.services import audit, events
 from app.services.permissions import Permission, require
 
 
@@ -197,5 +197,17 @@ async def accept(session: AsyncSession, principal: Principal, token: str) -> uui
         entity_id=member.id,
         business_id=business_id,
         changes={"role": invitation.role, "invitation_id": str(invitation.id)},
+    )
+    user = await session.get(User, principal.user_id)
+    events.emit(
+        session,
+        business_id,
+        "member.joined",
+        {
+            "user_id": str(principal.user_id),
+            "email": principal.email,
+            "name": user.full_name if user else "",
+            "role": invitation.role,
+        },
     )
     return business_id

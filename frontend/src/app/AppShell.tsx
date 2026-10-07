@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { useSession } from "../auth/context";
+import { NotificationBell } from "../features/notifications/NotificationBell";
 import { MfaRequiredPage } from "../pages/MfaRequiredPage";
 import { NAV_ITEMS } from "./navigation";
 
@@ -116,6 +117,7 @@ export function AppShell() {
               {current.business.display_name}
             </Typography>
           )}
+          {current && <NotificationBell businessId={current.business.id} />}
           <IconButton
             aria-label={t("app.userMenu")}
             onClick={(e) => setUserMenu(e.currentTarget)}

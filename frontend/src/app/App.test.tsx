@@ -244,4 +244,57 @@ describe("App", () => {
       expect.stringMatching(/\/reports\/income\.xlsx\?date_from=/),
     );
   });
+
+  it("shows unread notifications under the bell and marks one read when opened", async () => {
+    const fetchMock = mockApi({
+      "/api/v1/me": () => json(me()),
+      "/api/v1/health": HEALTH,
+      "/api/v1/businesses/b1/notifications/unread-count": () => json({ unread: 3 }),
+      "/api/v1/businesses/b1/notifications/read": () => json({ unread: 2 }),
+      "/api/v1/businesses/b1/notifications": () =>
+        json([
+          {
+            id: "n1",
+            event: "payment_received",
+            title: "התקבל תשלום",
+            body: "קבלה מס׳ 4 מבטא שיווק: ₪5,000.00",
+            link: "/documents/d4",
+            read_at: null,
+            created_at: new Date().toISOString(),
+          },
+        ]),
+    });
+    renderAt("/");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "התראות, 3 חדשות" }));
+    expect(await screen.findByText("קבלה מס׳ 4 מבטא שיווק: ₪5,000.00")).toBeInTheDocument();
+    expect(screen.getByText("עכשיו")).toBeInTheDocument();
+    await user.click(screen.getByText("התקבל תשלום"));
+
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(post![0]).toBe("/api/v1/businesses/b1/notifications/read");
+    expect(JSON.parse(String(post![1]!.body))).toEqual({ ids: ["n1"] });
+  });
+
+  it("saves a notification channel choice from the profile page", async () => {
+    const prefs = [
+      { event: "payment_received", channels: { in_app: true, email: false } },
+      { event: "invoice_overdue", channels: { in_app: true, email: true } },
+    ];
+    const fetchMock = mockApi({
+      "/api/v1/me/notification-preferences": () => json(prefs),
+      "/api/v1/me": () => json(me()),
+    });
+    renderAt("/profile");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("switch", { name: "התקבל תשלום: במייל" }));
+
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+    expect(put![0]).toBe("/api/v1/me/notification-preferences");
+    expect(JSON.parse(String(put![1]!.body))).toEqual({
+      preferences: { payment_received: { in_app: true, email: true } },
+    });
+  });
 });

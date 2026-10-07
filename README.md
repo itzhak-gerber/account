@@ -58,6 +58,10 @@ You can also register new users from the login page; the verification email arri
 10. **דוחות** (Reports): income and VAT for any period (presets include the last two-month VAT
     period), money received by payment method, and open balances by customer with days late.
     Each report downloads to Excel (**הורדה לאקסל**).
+11. **התראות** (Notifications, the bell at the top): payments received, documents issued by
+    others or by an AI assistant, invoices not paid on time (checked daily), failed emails to
+    customers, and new team members. Choose what also comes by email under
+    **פרופיל ואבטחה** (Profile). Phone push notifications come once the app runs on HTTPS.
 
 ### Connecting an AI assistant (MCP)
 

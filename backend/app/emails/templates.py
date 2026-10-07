@@ -89,3 +89,20 @@ def document_email(
     )
     text = f"{message}\n\n{title} מס׳ {number} – סה״כ {total} ₪ (מצורף כקובץ PDF)\n{business_name}"
     return html, text
+
+
+def notification_email(*, to: str, business_name: str, title: str, link: str) -> Email:
+    """A short alert pointing back to the app. Amounts and customer details stay in the app."""
+    subject = f"{title} · {business_name}"
+    html = _layout(
+        f'<h2 style="margin-top:0">{escape(title)}</h2>'
+        f"<p>התראה חדשה בעסק <strong>{escape(business_name)}</strong>.</p>"
+        f'<p><a href="{escape(link)}" style="display:inline-block;background:#1e4fd8;color:#fff;'
+        'padding:12px 20px;border-radius:8px;text-decoration:none">לפרטים במערכת</a></p>'
+        '<p style="color:#6b7280">אפשר לבחור אילו התראות יגיעו במייל במסך "פרופיל ואבטחה".</p>'
+    )
+    text = (
+        f"{title}\nהתראה חדשה בעסק {business_name}.\nלפרטים: {link}\n\n"
+        'אפשר לבחור אילו התראות יגיעו במייל במסך "פרופיל ואבטחה".'
+    )
+    return Email(to=to, subject=subject, html=html, text=text)

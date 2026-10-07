@@ -13,6 +13,7 @@ import { DocumentsPage } from "../pages/DocumentsPage";
 import { InvitePage } from "../pages/InvitePage";
 import { ItemsPage } from "../pages/ItemsPage";
 import { LandingPage } from "../pages/LandingPage";
+import { NotificationsPage } from "../pages/NotificationsPage";
 import { OnboardingPage } from "../pages/OnboardingPage";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { ProfilePage } from "../pages/ProfilePage";
@@ -54,6 +55,7 @@ function AuthenticatedRoutes() {
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/items" element={<ItemsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
               {placeholders.map((item) => (
                 <Route
                   key={item.path}

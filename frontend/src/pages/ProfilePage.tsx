@@ -8,15 +8,22 @@ import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useMutation } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router";
 
 import { api, startLogin } from "../api/client";
 import { useSession } from "../auth/context";
+import { PreferencesCard } from "../features/notifications/PreferencesCard";
 import { errorMessage } from "../lib/errors";
 
 export function ProfilePage() {
   const { t } = useTranslation();
   const { me } = useSession();
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+  }, [hash]);
   const logoutAll = useMutation({
     mutationFn: () => api.post<{ logout_url: string }>("/auth/logout-all"),
     onSuccess: ({ logout_url }) => window.location.assign(logout_url),
@@ -38,6 +45,7 @@ export function ProfilePage() {
           </Typography>
         </CardContent>
       </Card>
+      <PreferencesCard />
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={2}>

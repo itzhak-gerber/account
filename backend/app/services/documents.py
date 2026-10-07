@@ -23,9 +23,9 @@ from app.models import (
     DocumentRelation,
     DocumentStatus,
     DocumentType,
-    OutboxEvent,
     RelationType,
     StoredFile,
+    User,
     VatType,
 )
 from app.pdf.render import Variant, render_pdf
@@ -45,7 +45,7 @@ from app.schemas.documents import (
     PaymentStatus,
     RelatedDocument,
 )
-from app.services import audit, branding, catalog, numbering, vat
+from app.services import audit, branding, catalog, events, numbering, vat
 from app.services.calc import ZERO, LineInput, compute_totals, money
 from app.services.document_rules import (
     CONVERSIONS,
@@ -868,18 +868,22 @@ async def issue(session: AsyncSession, ctx: BusinessContext, document_id: uuid.U
     session.add(file)
     await session.flush()
     document.original_pdf_file_id = file.id
-    session.add(
-        OutboxEvent(
-            business_id=ctx.business_id,
-            event_type="document.issued",
-            payload={
-                "document_id": str(document.id),
-                "type": document.type,
-                "number": document.number,
-                "total": str(document.total),
-                "customer_id": str(document.customer_id) if document.customer_id else None,
-            },
-        )
+    actor = await session.get(User, ctx.principal.user_id)
+    events.emit(
+        session,
+        ctx.business_id,
+        "document.issued",
+        {
+            "document_id": str(document.id),
+            "type": document.type,
+            "number": document.number,
+            "total": str(document.total),
+            "customer_id": str(document.customer_id) if document.customer_id else None,
+            "customer_name": (document.customer or {}).get("name", ""),
+            "actor_user_id": str(ctx.principal.user_id),
+            "actor_name": (actor.full_name or actor.email) if actor else "",
+            "channel": ctx.principal.channel,
+        },
     )
     await session.flush()
     await audit.record(

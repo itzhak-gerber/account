@@ -338,3 +338,28 @@ export interface Dashboard {
   overdue_documents: number;
   income_by_month: { month: string; amount: string }[];
 }
+
+// --- notifications ------------------------------------------------------------------
+
+export type NotificationEvent =
+  "payment_received" | "document_issued" | "invoice_overdue" | "email_failed" | "member_joined";
+
+export interface AppNotification {
+  id: string;
+  event: NotificationEvent;
+  title: string;
+  body: string;
+  link: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface ChannelPrefs {
+  in_app: boolean;
+  email: boolean;
+}
+
+export interface NotificationPreference {
+  event: NotificationEvent;
+  channels: ChannelPrefs;
+}

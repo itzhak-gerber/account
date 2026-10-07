@@ -35,8 +35,9 @@ from app.schemas.documents import (
     EmailRequest,
 )
 from app.schemas.identity import BusinessOut, MemberOut, UserOut
+from app.schemas.notifications import NotificationOut
 from app.schemas.reports import IncomeReport, OpenBalancesReport, ReceiptsReport, ReportName
-from app.services import businesses, catalog, delivery, documents, reports
+from app.services import businesses, catalog, delivery, documents, notifications, reports
 from app.services.system import SystemStatus, get_system_status
 
 
@@ -348,5 +349,29 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
             if not include_documents:
                 result.documents = []
             return result
+
+    # --- notifications -------------------------------------------------------------------
+
+    @mcp.tool()
+    async def list_notifications(
+        business_id: uuid.UUID, unread_only: bool = True, limit: int = 20
+    ) -> list[NotificationOut]:
+        """The user's notifications in this business (payments received, overdue invoices,
+        failed emails, new members, documents issued by others), newest first."""
+        async with _business_session(business_id) as (session, ctx):
+            return await notifications.list_notifications(
+                session, ctx, unread_only=unread_only, limit=min(limit, 100)
+            )
+
+    @mcp.tool()
+    async def mark_notifications_read(
+        business_id: uuid.UUID, notification_ids: list[uuid.UUID] | None = None
+    ) -> int:
+        """Mark notifications as read: the given ids, or all of them when none are given.
+        Returns how many unread notifications are left."""
+        async with _business_session(business_id) as (session, ctx):
+            await notifications.mark_read(session, ctx, notification_ids)
+            await commit(session)
+            return await notifications.unread_count(session, ctx)
 
     return mcp

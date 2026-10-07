@@ -24,6 +24,13 @@ async def app_client() -> AsyncIterator[AsyncClient]:
         yield client
 
 
+@asynccontextmanager
+async def second_client(client: AsyncClient) -> AsyncIterator[AsyncClient]:
+    """Another browser (own cookies) on the same running app, for tests with several users."""
+    async with AsyncClient(transport=client._transport, base_url=client.base_url) as other:
+        yield other
+
+
 @dataclass
 class Browser:
     """A logged-in browser: cookies live in the client, CSRF token is sent on writes."""
@@ -39,6 +46,9 @@ class Browser:
 
     async def patch(self, url: str, json: object = None) -> Response:
         return await self.client.patch(url, json=json, headers={"X-CSRF-Token": self.csrf})
+
+    async def put(self, url: str, json: object = None) -> Response:
+        return await self.client.put(url, json=json, headers={"X-CSRF-Token": self.csrf})
 
     async def delete(self, url: str) -> Response:
         return await self.client.delete(url, headers={"X-CSRF-Token": self.csrf})
