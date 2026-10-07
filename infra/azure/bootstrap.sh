@@ -75,6 +75,13 @@ if [ "$missing" = 1 ]; then
 fi
 
 step "Resource group $RESOURCE_GROUP"
+existing=$(az group show --name "$RESOURCE_GROUP" --query location -o tsv 2>/dev/null || true)
+if [ -n "$existing" ] && [ "$existing" != "$LOCATION" ]; then
+  echo "   It already exists in $existing (resources follow the group's region)."
+  echo "   If it is empty (e.g. left by an earlier attempt), delete it and run again:"
+  echo "       az group delete --name $RESOURCE_GROUP --yes"
+  exit 1
+fi
 az group create --name "$RESOURCE_GROUP" --location "$LOCATION" \
   --tags app=invoice env=dev -o none
 RG_ID=$(az group show --name "$RESOURCE_GROUP" --query id -o tsv)

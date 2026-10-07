@@ -496,4 +496,5 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | 7 | Phone notifications | PWA + Web Push first; WhatsApp/SMS later (§9) |
 | 8 | Infrastructure as code | **Bicep** instead of Terraform: native to Azure and Cloud Shell, no state storage to run, compiled and linted in CI. Azure-specific code would not carry over to AWS with either tool |
 | 9 | Frontend hosting | The built app is served by nginx in Container Apps (not Static Web Apps), which also forwards `/api`, `/auth`, `/mcp` to the backend: one origin for the secure session cookie |
+| 11 | Dev environment region | **Sweden Central**: Container Apps is not offered in Israel Central yet, and West Europe was closed to new trial subscriptions. Test data only; production region decided in M8 (Israel Central when Container Apps arrives, another Israel-hosted service, or EU) |
 | 10 | Dev environment sizing | Burstable PostgreSQL (B1ms), Redis as a small container, one replica per app; about $45–60 a month. Production gets HA PostgreSQL and Azure Cache for Redis (M8) |

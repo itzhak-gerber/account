@@ -1,6 +1,7 @@
 # Azure "dev" environment
 
-Everything runs in one resource group in **Israel Central**:
+Everything runs in one resource group in **Sweden Central** (Container Apps is not offered in
+Israel Central yet, and West Europe was not accepting new trial subscriptions):
 
 | Part | Azure service | Notes |
 |---|---|---|
@@ -20,7 +21,8 @@ Everything runs in one resource group in **Israel Central**:
 
 1. In the Azure portal open **Cloud Shell** (`>_` at the top), choose **Bash**.
 2. Upload `infra/azure/bootstrap.sh` (Cloud Shell toolbar: *Manage files* → *Upload*).
-3. Run `bash bootstrap.sh`. At the end it prints a value named `AZURE_ENV`.
+3. Run `LOCATION=swedencentral bash bootstrap.sh`. At the end it prints a value named
+   `AZURE_ENV`.
 4. In GitHub: repository **Settings** → **Secrets and variables** → **Actions** →
    **Variables** → **New repository variable**: name `AZURE_ENV`, value as printed.
 
