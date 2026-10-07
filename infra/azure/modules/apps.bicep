@@ -147,7 +147,7 @@ resource keycloak 'Microsoft.App/containerApps@2025-01-01' = {
             { name: 'KC_HOSTNAME', value: authUrl }
             { name: 'KC_BOOTSTRAP_ADMIN_USERNAME', value: 'admin' }
             { name: 'KC_BOOTSTRAP_ADMIN_PASSWORD', secretRef: 'keycloak-admin-password' }
-            { name: 'JAVA_OPTS_KC_HEAP', value: '-XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=40' }
+            { name: 'JAVA_OPTS_KC_HEAP', value: '-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30' }
             // Filled into the realm on first import.
             { name: 'APP_PUBLIC_URL', value: appUrl }
             { name: 'INVOICE_WEB_CLIENT_SECRET', secretRef: 'web-client-secret' }
@@ -157,14 +157,15 @@ resource keycloak 'Microsoft.App/containerApps@2025-01-01' = {
             { name: 'SMTP_PASSWORD', secretRef: 'smtp-password' }
             { name: 'SMTP_FROM', value: smtpFrom }
           ]
-          resources: { cpu: json('0.75'), memory: '1.5Gi' }
+          // Dev size: enough for a few users; startup is slower, hence the longer startup probe.
+          resources: { cpu: json('0.5'), memory: '1Gi' }
           probes: [
             {
               type: 'Startup'
               httpGet: { path: '/health/started', port: 9000 }
               initialDelaySeconds: 20
               periodSeconds: 10
-              failureThreshold: 10
+              failureThreshold: 30
             }
             {
               type: 'Readiness'
