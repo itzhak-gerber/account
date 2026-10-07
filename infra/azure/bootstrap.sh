@@ -57,9 +57,11 @@ for pair in Microsoft.App/managedEnvironments Microsoft.App/jobs \
   Microsoft.DBforPostgreSQL/flexibleServers Microsoft.ContainerRegistry/registries \
   Microsoft.KeyVault/vaults Microsoft.Storage/storageAccounts; do
   ns=${pair%%/*}; type=${pair#*/}
-  if az provider show --namespace "$ns" \
-      --query "resourceTypes[?resourceType=='$type'].locations[]" -o tsv | normalise \
-      | grep -qx "$LOCATION"; then
+  # Read the whole list first: piping into "grep -q" can end the pipe early, which strict
+  # mode (pipefail) would report as "not found".
+  locations=$(az provider show --namespace "$ns" \
+    --query "resourceTypes[?resourceType=='$type'].locations[]" -o tsv | normalise)
+  if grep -qx "$LOCATION" <<<"$locations"; then
     echo "   ok  $pair"
   else
     echo "   MISSING  $pair is not available in $LOCATION"; missing=1
@@ -80,7 +82,7 @@ RG_ID=$(az group show --name "$RESOURCE_GROUP" --query id -o tsv)
 step "Key Vault"
 VAULT=$(az keyvault list --resource-group "$RESOURCE_GROUP" --query "[0].name" -o tsv)
 if [ -z "$VAULT" ]; then
-  VAULT="kv-invoice-dev-$(tr -dc 'a-z0-9' </dev/urandom | head -c 6)"
+  VAULT="kv-invoice-dev-$(openssl rand -hex 3)"
   az keyvault create --name "$VAULT" --resource-group "$RESOURCE_GROUP" --location "$LOCATION" \
     --enable-rbac-authorization true --enabled-for-template-deployment true \
     --retention-days 30 --tags app=invoice env=dev -o none
