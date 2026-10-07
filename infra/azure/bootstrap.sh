@@ -19,6 +19,9 @@ SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-fb8aa579-e262-4701-834f-bb69d81db963}"
 LOCATION="${LOCATION:-israelcentral}"
 RESOURCE_GROUP="${RESOURCE_GROUP:-rg-invoice-dev}"
 GITHUB_REPO="${GITHUB_REPO:-itzhak-gerber/account}"
+# GitHub may identify the repository by numeric ids instead of names (owner@id/repo@id);
+# both forms are trusted. Ids: github.com/<owner>.json and the repository's API page.
+GITHUB_REPO_IDS="${GITHUB_REPO_IDS:-itzhak-gerber@6566935/account@1404653515}"
 GITHUB_ENVIRONMENT="dev"
 DEPLOY_APP_NAME="invoice-github-deploy"
 SMTP_APP_NAME="invoice-smtp"
@@ -113,17 +116,21 @@ ensure_app() { # ensure_app <display name> -> prints appId
 step "GitHub deployment identity ($DEPLOY_APP_NAME)"
 DEPLOY_APP_ID=$(ensure_app "$DEPLOY_APP_NAME")
 DEPLOY_SP_ID=$(az ad sp show --id "$DEPLOY_APP_ID" --query id -o tsv)
-SUBJECT="repo:${GITHUB_REPO}:environment:${GITHUB_ENVIRONMENT}"
-if [ -z "$(az ad app federated-credential list --id "$DEPLOY_APP_ID" \
-    --query "[?subject=='$SUBJECT'].name" -o tsv)" ]; then
-  az ad app federated-credential create --id "$DEPLOY_APP_ID" --parameters "{
-    \"name\": \"github-${GITHUB_ENVIRONMENT}\",
-    \"issuer\": \"https://token.actions.githubusercontent.com\",
-    \"subject\": \"$SUBJECT\",
-    \"audiences\": [\"api://AzureADTokenExchange\"]
-  }" -o none
-fi
-echo "   trusts only: $SUBJECT"
+add_subject() { # add_subject <credential name> <subject>
+  if [ -z "$(az ad app federated-credential list --id "$DEPLOY_APP_ID" \
+      --query "[?subject=='$2'].name" -o tsv)" ]; then
+    az ad app federated-credential create --id "$DEPLOY_APP_ID" --parameters "{
+      \"name\": \"$1\",
+      \"issuer\": \"https://token.actions.githubusercontent.com\",
+      \"subject\": \"$2\",
+      \"audiences\": [\"api://AzureADTokenExchange\"]
+    }" -o none
+  fi
+  echo "   trusts only: $2"
+}
+add_subject "github-${GITHUB_ENVIRONMENT}" "repo:${GITHUB_REPO}:environment:${GITHUB_ENVIRONMENT}"
+add_subject "github-${GITHUB_ENVIRONMENT}-ids" \
+  "repo:${GITHUB_REPO_IDS}:environment:${GITHUB_ENVIRONMENT}"
 for role in "Contributor" "Role Based Access Control Administrator"; do
   az role assignment create --assignee-object-id "$DEPLOY_SP_ID" \
     --assignee-principal-type ServicePrincipal --role "$role" --scope "$RG_ID" -o none
