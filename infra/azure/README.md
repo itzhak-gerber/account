@@ -51,6 +51,13 @@ server is the slowest part); later ones about 10.
 6. Stage **apps**: rolls out the new version.
 7. Smoke test: the app, the API health check and Keycloak.
 
+## Pause and resume (saves most of the cost while not working)
+
+On GitHub: **Actions** → **Pause dev environment** → **Run workflow**. All apps scale to zero
+and the database stops; data is kept. **Resume dev environment** brings everything back in
+about 5 minutes (any deploy resumes it too). Azure restarts a stopped database by itself after
+7 days. Both also work from the GitHub mobile app.
+
 ## Useful commands (Cloud Shell)
 
 ```bash

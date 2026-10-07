@@ -1,0 +1,68 @@
+name: Resume dev environment
+
+# Run from GitHub: Actions -> "Resume dev environment" -> Run workflow.
+# Starts the database and brings every app back (about 5 minutes).
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: dev
+      url: ${{ steps.apps.outputs.app_url }}
+    env:
+      RG: ${{ fromJSON(vars.AZURE_ENV).resourceGroup }}
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ fromJSON(vars.AZURE_ENV).clientId }}
+          tenant-id: ${{ fromJSON(vars.AZURE_ENV).tenantId }}
+          subscription-id: ${{ fromJSON(vars.AZURE_ENV).subscriptionId }}
+
+      - name: Start the database
+        run: |
+          server=$(az postgres flexible-server list --resource-group "$RG" --query "[0].name" -o tsv)
+          state=$(az postgres flexible-server show --resource-group "$RG" --name "$server" \
+            --query state -o tsv)
+          if [ "$state" = "Stopped" ]; then
+            az postgres flexible-server start --resource-group "$RG" --name "$server" -o none
+          fi
+          echo "$server: $(az postgres flexible-server show --resource-group "$RG" \
+            --name "$server" --query state -o tsv)"
+
+      - name: Apps back to one replica each
+        id: apps
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt -o none
+          # Redis and the login server first: the others depend on them.
+          for app in redis auth backend worker invoice; do
+            az containerapp update --name "$app" --resource-group "$RG" --min-replicas 1 -o none
+            echo "$app: running"
+          done
+          fqdn=$(az containerapp show --name invoice --resource-group "$RG" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "app_url=https://$fqdn" >> "$GITHUB_OUTPUT"
+
+      - name: Check it answers
+        env:
+          APP_URL: ${{ steps.apps.outputs.app_url }}
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS --max-time 10 "$APP_URL/api/v1/health" > /dev/null; then
+              echo "ok  $APP_URL"
+              echo "### Dev environment resumed: $APP_URL" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "The app did not answer within 5 minutes"; exit 1

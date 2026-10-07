@@ -38,6 +38,15 @@ jobs:
       - name: Azure CLI extensions install without prompts
         run: az config set extension.use_dynamic_install=yes_without_prompt -o none
 
+      - name: Database running (it may have been paused)
+        run: |
+          server=$(az postgres flexible-server list --resource-group "$RG" --query "[0].name" -o tsv)
+          if [ -n "$server" ] && [ "$(az postgres flexible-server show --resource-group "$RG" \
+              --name "$server" --query state -o tsv)" = "Stopped" ]; then
+            echo "starting $server"
+            az postgres flexible-server start --resource-group "$RG" --name "$server" -o none
+          fi
+
       - name: Secrets exist in Key Vault (generated once, never printed)
         run: |
           for name in pg-admin-password app-db-password keycloak-db-password redis-password \
