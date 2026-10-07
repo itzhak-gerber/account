@@ -26,10 +26,11 @@ jobs:
       SMTP_APP_ID: ${{ fromJSON(vars.AZURE_ENV).smtpAppId }}
       SMTP_PRINCIPAL_ID: ${{ fromJSON(vars.AZURE_ENV).smtpPrincipalId }}
       TAG: ${{ github.sha }}
-      # Optional AZURE_ENV fields, for when the default database size has no capacity.
+      # Optional AZURE_ENV fields, for when the default database size or zone has no capacity
+      # (zone 1: Sweden Central had no B1ms capacity when Azure picked the zone).
       PG_SKU: ${{ fromJSON(vars.AZURE_ENV).postgresSku || 'Standard_B1ms' }}
       PG_TIER: ${{ fromJSON(vars.AZURE_ENV).postgresTier || 'Burstable' }}
-      PG_ZONE: ${{ fromJSON(vars.AZURE_ENV).postgresZone || '' }}
+      PG_ZONE: ${{ fromJSON(vars.AZURE_ENV).postgresZone || '1' }}
     steps:
       - uses: actions/checkout@v5
 
