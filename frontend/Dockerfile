@@ -14,7 +14,9 @@ FROM deps AS build
 COPY . .
 RUN npm run build
 
-# Static files only; in Azure the same dist/ goes to Static Web Apps.
+# Production: the built app behind nginx, which also forwards the API to the backend.
 FROM nginxinc/nginx-unprivileged:1.29-alpine AS prod
+ENV BACKEND_URL=http://backend
+COPY deploy/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 8080

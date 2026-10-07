@@ -2,9 +2,11 @@
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 
 class Settings(BaseSettings):
@@ -20,6 +22,10 @@ class Settings(BaseSettings):
     # The app connects as a restricted role (not the schema owner) so row-level security applies.
     database_url: str = "postgresql+asyncpg://invoice_app:invoice_app@localhost:5432/invoice"
     redis_url: str = "redis://localhost:6379/0"
+    # In the cloud the passwords come from Key Vault as separate secrets and are put into the
+    # URLs above, so no connection string with a password sits in plain configuration.
+    database_password: str | None = None
+    redis_password: str | None = None
 
     # OpenID Connect (Keycloak). The issuer is the URL browsers see; the backend may reach
     # Keycloak on an internal address (e.g. inside docker-compose).
@@ -40,8 +46,15 @@ class Settings(BaseSettings):
 
     # Signs short-lived download links (e.g. PDFs for MCP clients). Must be set in production.
     secret_key: str = "dev-only-secret-key-change-me"  # noqa: S105
-    # Where generated files (PDFs) are stored locally; Azure Blob Storage comes with M1b.
+    # Generated files (PDFs, logos): a local folder, or Azure Blob Storage in the cloud.
+    storage_backend: Literal["local", "azure"] = "local"
     storage_dir: str = "var/files"
+    azure_storage_account_url: str | None = None  # https://<account>.blob.core.windows.net
+    azure_storage_container: str = "files"
+    # Only for local tests against the Azurite emulator; the cloud uses a managed identity.
+    azure_storage_connection_string: str | None = None
+    # The user-assigned managed identity's client id (also used by Azure SDKs).
+    azure_client_id: str | None = None
     timezone: str = "Asia/Jerusalem"
     # Israel Tax Authority allocation numbers: off until the software is registered.
     ita_allocation_enabled: bool = False
@@ -69,6 +82,19 @@ class Settings(BaseSettings):
     def _production_secrets(self) -> "Settings":
         if self.environment == "production" and self.secret_key.startswith("dev-only"):
             raise ValueError("APP_SECRET_KEY must be set in production")
+        return self
+
+    @model_validator(mode="after")
+    def _insert_passwords(self) -> "Settings":
+        if self.database_password:
+            url = make_url(self.database_url).set(password=self.database_password)
+            self.database_url = url.render_as_string(hide_password=False)
+        if self.redis_password:
+            parts = urlsplit(self.redis_url)
+            host = parts.netloc.rsplit("@", 1)[-1]
+            user = parts.username or ""
+            netloc = f"{quote(user, safe='')}:{quote(self.redis_password, safe='')}@{host}"
+            self.redis_url = urlunsplit(parts._replace(netloc=netloc))
         return self
 
     @property

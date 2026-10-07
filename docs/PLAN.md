@@ -139,7 +139,7 @@ These rules shape the data model. **Have an Israeli CPA confirm them before go-l
 | Tests | pytest + testcontainers (real Postgres), Vitest, Playwright (desktop + mobile viewports) | |
 | Quality | ruff, mypy (strict), eslint, prettier, pre-commit | |
 | CI/CD | GitHub Actions → Azure Container Registry → Azure Container Apps (OIDC federated login, no stored passwords) | |
-| IaC | Terraform (`infra/terraform/azure` first; `aws` later if needed) | |
+| IaC | Bicep (`infra/azure`), deployed by GitHub Actions; see decision 8 | |
 | Observability | OpenTelemetry → Azure Monitor / Application Insights, structured JSON logs | |
 
 ---
@@ -432,7 +432,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 |---|---|---|
 | **M0** ✅ | Foundations | Monorepo skeleton, docker-compose (Postgres, Redis, Keycloak), FastAPI + React "hello", CI (lint, types, tests), pre-commit, Alembic baseline, empty MCP server mounted at `/mcp` |
 | **M1a** ✅ | Auth and tenancy | Keycloak realm, BFF login/logout, JWT validation for MCP, Principal, businesses, members, invitations, roles, RLS policies, audit log, Hebrew RTL app shell |
-| **M1b** | Azure dev environment | Terraform for Azure (Container Apps, PostgreSQL Flexible Server, Blob Storage for PDFs, Key Vault, Static Web Apps), GitHub Actions deploy with OIDC federation, production Keycloak realm (no dev users / password-grant client), OAuth scopes + dynamic client registration for MCP clients, budget alert |
+| **M1b** | Azure dev environment | 🟡 built, waiting for the first deploy: Bicep for Azure (Container Apps in a private network, PostgreSQL Flexible Server on a private subnet, Blob Storage for PDFs, Key Vault, Azure Communication Services email), GitHub Actions deploy with OIDC federation, production Keycloak realm (no dev users / password-grant client), budget alert ✅; remaining: OAuth scopes + dynamic client registration for MCP clients |
 | **M2** ✅ | Catalog | Customers and items: CRUD, search, UI, MCP tools |
 | **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
 | **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links, documents emailed to customers (PDF attached, logo inline, retries, delivery history) |
@@ -494,3 +494,6 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | 5 | ITA software registration | **Deferred.** Allocation numbers are built behind a feature flag |
 | 6 | Inventory | Not in v1; data model prepared (§10) |
 | 7 | Phone notifications | PWA + Web Push first; WhatsApp/SMS later (§9) |
+| 8 | Infrastructure as code | **Bicep** instead of Terraform: native to Azure and Cloud Shell, no state storage to run, compiled and linted in CI. Azure-specific code would not carry over to AWS with either tool |
+| 9 | Frontend hosting | The built app is served by nginx in Container Apps (not Static Web Apps), which also forwards `/api`, `/auth`, `/mcp` to the backend: one origin for the secure session cookie |
+| 10 | Dev environment sizing | Burstable PostgreSQL (B1ms), Redis as a small container, one replica per app; about $45–60 a month. Production gets HA PostgreSQL and Azure Cache for Redis (M8) |

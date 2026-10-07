@@ -66,6 +66,11 @@ You can also register new users from the login page; the verification email arri
     and what customers owe. **New-device alerts**: signing in from a browser the account has not
     used before sends an alert; the profile page lists your devices and lets you remove one.
 
+### Running in Azure
+
+The test environment in Azure ("dev") is described in [infra/azure/README.md](infra/azure/README.md):
+a one-time setup script for Cloud Shell, then every push deploys automatically after the tests pass.
+
 ### Connecting an AI assistant (MCP)
 
 The MCP endpoint is protected with OAuth 2.1. Clients discover the login server from
