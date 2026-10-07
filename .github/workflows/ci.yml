@@ -10,7 +10,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run that may be deploying (a half-finished migration helps nobody).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/claude/stoic-goldberg-6t002s' }}
 
 jobs:
   backend:
@@ -33,11 +34,16 @@ jobs:
         ports: ["6379:6379"]
         options: >-
           --health-cmd "redis-cli ping" --health-interval 3s --health-retries 20
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports: ["10000:10000"]
     env:
       APP_ENVIRONMENT: test
       # Tests connect as the restricted app role so row-level security is exercised.
       APP_DATABASE_URL: postgresql+asyncpg://invoice_app:invoice_app@localhost:5432/invoice
       APP_TEST_ADMIN_DATABASE_URL: postgresql+asyncpg://invoice:invoice@localhost:5432/invoice
+      # Azurite's well-known development account (public, emulator only).
+      APP_TEST_AZURITE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
@@ -86,12 +92,21 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  keycloak-realm:
+  infra:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Realm file is valid JSON
-        run: python3 -m json.tool infra/keycloak/realm-invoice.dev.json > /dev/null
+      - name: Realm files are valid, and the production realm is up to date
+        run: |
+          python3 -m json.tool infra/keycloak/realm-invoice.dev.json > /dev/null
+          python3 infra/keycloak/build_prod_realm.py --check
+      - name: Azure definition compiles and passes the linter
+        run: |
+          az bicep install
+          az bicep build --file infra/azure/main.bicep --stdout > /dev/null
+          az bicep lint --file infra/azure/main.bicep
+      - name: Setup script
+        run: shellcheck infra/azure/bootstrap.sh
 
   docker:
     runs-on: ubuntu-latest
@@ -107,3 +122,15 @@ jobs:
           assert pdf.startswith(b'%PDF'), 'no PDF'
           print('PDF OK', len(pdf))"
       - run: docker build --target prod -t invoice-frontend frontend
+      - run: docker build -t invoice-keycloak infra/keycloak
+
+  deploy:
+    needs: [docker, infra]
+    # Only from the deploying branches, and only once Azure is set up (bootstrap.sh).
+    if: >-
+      github.event_name == 'push' && vars.AZURE_ENV != '' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/stoic-goldberg-6t002s')
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/deploy.yml
