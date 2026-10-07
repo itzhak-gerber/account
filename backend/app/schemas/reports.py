@@ -140,3 +140,16 @@ class Dashboard(BaseModel):
     overdue_documents: int
     # The last 12 months, oldest first: net income (or money received).
     income_by_month: list[MonthAmount]
+
+
+class DailySummary(BaseModel):
+    day: date
+    vat_registered: bool
+    issued: dict[DocumentType, int]  # documents dated that day, by type
+    income_net: Decimal
+    income_vat: Decimal
+    received: Decimal
+    open_balance: Decimal
+    open_documents: int
+    overdue_balance: Decimal
+    overdue_documents: int

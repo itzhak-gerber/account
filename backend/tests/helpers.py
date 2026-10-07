@@ -57,7 +57,11 @@ class Browser:
 async def browser_login(
     client: AsyncClient, idp: FakeIdP, user: FakeUser, *, mfa: bool = False
 ) -> Browser:
+    # Like a real browser after logging out: the session is gone, the device cookie stays.
+    device = next((c for c in client.cookies.jar if c.name == "invoice_device"), None)
     client.cookies.clear()
+    if device is not None:
+        client.cookies.jar.set_cookie(device)
     start = await client.get("/auth/login", params={"return_to": "/settings"})
     assert start.status_code == 302, start.text
     params = {k: v[0] for k, v in parse_qs(urlparse(start.headers["location"]).query).items()}

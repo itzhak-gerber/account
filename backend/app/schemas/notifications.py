@@ -39,3 +39,14 @@ class PreferenceOut(BaseModel):
 
 class PreferencesIn(BaseModel):
     preferences: dict[NotificationEvent, ChannelPrefs]
+
+
+class DeviceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    label: str
+    last_ip: str
+    first_seen_at: datetime
+    last_seen_at: datetime
+    current: bool = False  # the browser making this request

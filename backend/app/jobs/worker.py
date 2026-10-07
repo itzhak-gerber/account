@@ -156,7 +156,9 @@ async def _dispatch_one(
 ) -> None:
     async with get_sessionmaker()() as session:
         await set_rls_context(session, business_id=business_id)
-        message = await notifications.message_for(session, event_id, event_type, payload)
+        message = await notifications.message_for(
+            session, business_id, event_id, event_type, payload
+        )
         delivered = 0
         if message is not None:
             delivered = await notifications.deliver(session, business_id, message)
@@ -217,6 +219,20 @@ async def raise_overdue_events(ctx: dict[str, Any]) -> int:
     return int(count or 0)
 
 
+async def raise_daily_summaries(ctx: dict[str, Any]) -> int:
+    """Every morning: one summary of yesterday per business that has issued documents."""
+    async with get_sessionmaker()() as session:
+        count = await session.scalar(
+            text("SELECT enqueue_daily_summaries(:day)"),
+            {"day": today() - timedelta(days=1)},
+        )
+        await session.commit()
+    log.info("daily_summaries.raised", count=count)
+    if count:
+        await dispatch_outbox(ctx)
+    return int(count or 0)
+
+
 class WorkerSettings:
     functions: ClassVar[list[Any]] = [
         ping,
@@ -225,11 +241,14 @@ class WorkerSettings:
         # No stored result, so the next "kick" with the same job id is accepted right away.
         func(dispatch_outbox, name=events.DISPATCH_JOB, keep_result=0),
         raise_overdue_events,
+        raise_daily_summaries,
     ]
     cron_jobs: ClassVar[list[Any]] = [
         # A safety net for events whose "kick" was lost (e.g. Redis was briefly down).
         cron(dispatch_outbox, name="dispatch_outbox_sweep", second={0, 30}, run_at_startup=True),
         cron(raise_overdue_events, hour={8}, minute={5}),  # 08:05 Israel time
+        # Before the overdue check, so the summary counts yesterday's state.
+        cron(raise_daily_summaries, hour={7}, minute={30}),
     ]
     timezone = ZoneInfo(get_settings().timezone)
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

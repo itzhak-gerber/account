@@ -284,12 +284,26 @@ describe("App", () => {
     ];
     const fetchMock = mockApi({
       "/api/v1/me/notification-preferences": () => json(prefs),
+      "/api/v1/me/devices": () =>
+        json([
+          {
+            id: "dev1",
+            label: "Chrome · Windows",
+            last_ip: "10.0.0.5",
+            first_seen_at: "2026-10-01T08:00:00Z",
+            last_seen_at: "2026-10-07T08:00:00Z",
+            current: true,
+          },
+        ]),
       "/api/v1/me": () => json(me()),
     });
     renderAt("/profile");
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("switch", { name: "התקבל תשלום: במייל" }));
+    const devices = await screen.findByRole("list", { name: "מכשירים שנכנסו לחשבון" });
+    expect(within(devices).getByText("Chrome · Windows")).toBeInTheDocument();
+    expect(within(devices).getByText("המכשיר הזה")).toBeInTheDocument();
 
     const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
     expect(put![0]).toBe("/api/v1/me/notification-preferences");

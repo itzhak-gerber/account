@@ -1,18 +1,20 @@
+import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request, status
 
 from app.auth.principal import CurrentBusiness, CurrentPrincipal, DbSession
 from app.core.db import commit
 from app.schemas.notifications import (
+    DeviceOut,
     MarkRead,
     NotificationOut,
     PreferenceOut,
     PreferencesIn,
     UnreadCount,
 )
-from app.services import notifications
+from app.services import devices, notifications
 
 router = APIRouter(tags=["notifications"])
 
@@ -54,3 +56,19 @@ async def set_preferences(
     result = await notifications.set_preferences(session, principal, data.preferences)
     await commit(session)
     return result
+
+
+@router.get("/me/devices")
+async def list_devices(
+    request: Request, principal: CurrentPrincipal, session: DbSession
+) -> list[DeviceOut]:
+    token = request.cookies.get(devices.DEVICE_COOKIE)
+    return await devices.list_devices(session, principal.user_id, token)
+
+
+@router.delete("/me/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def forget_device(
+    device_id: uuid.UUID, principal: CurrentPrincipal, session: DbSession
+) -> None:
+    await devices.forget(session, principal.user_id, device_id)
+    await commit(session)

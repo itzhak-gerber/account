@@ -1,8 +1,10 @@
+import DevicesOutlined from "@mui/icons-material/DevicesOutlined";
 import ErrorOutlineRounded from "@mui/icons-material/ErrorOutlineRounded";
 import EventBusyOutlined from "@mui/icons-material/EventBusyOutlined";
 import PaymentsOutlined from "@mui/icons-material/PaymentsOutlined";
 import PersonAddAltOutlined from "@mui/icons-material/PersonAddAltOutlined";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
+import SummarizeOutlined from "@mui/icons-material/SummarizeOutlined";
 import Box from "@mui/material/Box";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
@@ -21,6 +23,8 @@ const ICONS: Record<NotificationEvent, ReactElement> = {
   invoice_overdue: <EventBusyOutlined color="warning" />,
   email_failed: <ErrorOutlineRounded color="error" />,
   member_joined: <PersonAddAltOutlined color="primary" />,
+  daily_summary: <SummarizeOutlined color="primary" />,
+  new_device_login: <DevicesOutlined color="warning" />,
 };
 
 export function NotificationList({

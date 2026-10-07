@@ -342,7 +342,13 @@ export interface Dashboard {
 // --- notifications ------------------------------------------------------------------
 
 export type NotificationEvent =
-  "payment_received" | "document_issued" | "invoice_overdue" | "email_failed" | "member_joined";
+  | "payment_received"
+  | "document_issued"
+  | "invoice_overdue"
+  | "email_failed"
+  | "member_joined"
+  | "daily_summary"
+  | "new_device_login";
 
 export interface AppNotification {
   id: string;
@@ -362,4 +368,13 @@ export interface ChannelPrefs {
 export interface NotificationPreference {
   event: NotificationEvent;
   channels: ChannelPrefs;
+}
+
+export interface Device {
+  id: string;
+  label: string;
+  last_ip: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  current: boolean;
 }

@@ -91,18 +91,37 @@ def document_email(
     return html, text
 
 
-def notification_email(*, to: str, business_name: str, title: str, link: str) -> Email:
-    """A short alert pointing back to the app. Amounts and customer details stay in the app."""
-    subject = f"{title} · {business_name}"
+def notification_email(
+    *,
+    to: str,
+    business_name: str | None,
+    title: str,
+    link: str,
+    details: tuple[tuple[str, str], ...] = (),
+    intro: str | None = None,
+) -> Email:
+    """A short alert pointing back to the app. Alerts carry no amounts or customer details;
+    only summaries the user chose to receive by email (``details``) include figures."""
+    subject = f"{title} · {business_name}" if business_name else title
+    intro = intro or (f"התראה חדשה בעסק {business_name}." if business_name else "")
+    rows = "".join(
+        f'<tr><td style="padding:6px 0;color:#6b7280">{escape(label)}</td>'
+        f'<td style="padding:6px 12px;font-weight:bold">{escape(value)}</td></tr>'
+        for label, value in details
+    )
+    table = f'<table style="border-collapse:collapse;margin:8px 0 16px">{rows}</table>'
     html = _layout(
         f'<h2 style="margin-top:0">{escape(title)}</h2>'
-        f"<p>התראה חדשה בעסק <strong>{escape(business_name)}</strong>.</p>"
-        f'<p><a href="{escape(link)}" style="display:inline-block;background:#1e4fd8;color:#fff;'
+        + (f"<p>{escape(intro)}</p>" if intro else "")
+        + (table if rows else "")
+        + f'<p><a href="{escape(link)}" style="display:inline-block;background:#1e4fd8;color:#fff;'
         'padding:12px 20px;border-radius:8px;text-decoration:none">לפרטים במערכת</a></p>'
         '<p style="color:#6b7280">אפשר לבחור אילו התראות יגיעו במייל במסך "פרופיל ואבטחה".</p>'
     )
     text = (
-        f"{title}\nהתראה חדשה בעסק {business_name}.\nלפרטים: {link}\n\n"
+        f"{title}\n{intro}\n"
+        + "".join(f"{label}: {value}\n" for label, value in details)
+        + f"לפרטים: {link}\n\n"
         'אפשר לבחור אילו התראות יגיעו במייל במסך "פרופיל ואבטחה".'
     )
     return Email(to=to, subject=subject, html=html, text=text)

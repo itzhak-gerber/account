@@ -16,6 +16,8 @@ class NotificationEvent(enum.StrEnum):
     INVOICE_OVERDUE = "invoice_overdue"  # an invoice passed its due date unpaid
     EMAIL_FAILED = "email_failed"  # a document email to a customer could not be sent
     MEMBER_JOINED = "member_joined"  # an invited user joined the business
+    DAILY_SUMMARY = "daily_summary"  # the morning summary of yesterday and open balances
+    NEW_DEVICE_LOGIN = "new_device_login"  # the account was signed in from a new device
 
 
 class Notification(IdMixin, Base):
@@ -28,7 +30,8 @@ class Notification(IdMixin, Base):
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    business_id: Mapped[uuid.UUID] = mapped_column(
+    # None for account-level messages (e.g. a sign-in from a new device), shown in every business.
+    business_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("businesses.id", ondelete="CASCADE"), index=True
     )
     event: Mapped[str] = mapped_column(String(30))
@@ -52,3 +55,24 @@ class NotificationPreference(Base):
     )
     event: Mapped[str] = mapped_column(String(30), primary_key=True)
     channels: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+
+
+class UserDevice(IdMixin, Base):
+    """A browser the user has signed in from, recognised by a long-lived random cookie.
+    Only a hash of the cookie is stored."""
+
+    __tablename__ = "user_devices"
+    __table_args__ = (UniqueConstraint("user_id", "device_hash", name="uq_user_devices_device"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    device_hash: Mapped[str] = mapped_column(String(64))
+    label: Mapped[str] = mapped_column(String(100))  # e.g. "Chrome · Windows"
+    last_ip: Mapped[str] = mapped_column(String(64), default="")
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

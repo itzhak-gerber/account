@@ -20,7 +20,12 @@ from app.models.documents import (
     VatRate,
 )
 from app.models.identity import Business, BusinessMember, BusinessType, Invitation, Role, User
-from app.models.notifications import Notification, NotificationEvent, NotificationPreference
+from app.models.notifications import (
+    Notification,
+    NotificationEvent,
+    NotificationPreference,
+    UserDevice,
+)
 
 __all__ = [
     "AuditLog",
@@ -50,6 +55,7 @@ __all__ = [
     "Role",
     "StoredFile",
     "User",
+    "UserDevice",
     "VatRate",
     "VatType",
 ]

@@ -62,6 +62,9 @@ You can also register new users from the login page; the verification email arri
     others or by an AI assistant, invoices not paid on time (checked daily), failed emails to
     customers, and new team members. Choose what also comes by email under
     **פרופיל ואבטחה** (Profile). Phone push notifications come once the app runs on HTTPS.
+12. **Daily summary** by email every morning (07:30): what was issued and received yesterday,
+    and what customers owe. **New-device alerts**: signing in from a browser the account has not
+    used before sends an alert; the profile page lists your devices and lets you remove one.
 
 ### Connecting an AI assistant (MCP)
 

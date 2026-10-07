@@ -31,7 +31,7 @@ from app.core.config import get_settings
 from app.core.db import commit, set_rls_context
 from app.core.errors import NotAuthenticated
 from app.core.redis import get_redis
-from app.services import audit
+from app.services import audit, devices
 from app.services.users import upsert_from_claims
 
 log = structlog.get_logger()
@@ -159,6 +159,9 @@ async def callback(
     await set_rls_context(session, user_id=user.id)
     ip = request.client.host if request.client else ""
     user_agent = request.headers.get("user-agent", "")[:500]
+    device_token = await devices.recognise(
+        session, user, request.cookies.get(devices.DEVICE_COOKIE), user_agent, ip
+    )
     session_id = await store.create(
         SessionData(
             user_id=str(user.id),
@@ -195,6 +198,12 @@ async def callback(
         session_cookie_name(get_settings()),
         session_id,
         max_age=get_settings().session_max_hours * 3600,
+        **_cookie_args(),  # type: ignore[arg-type]
+    )
+    response.set_cookie(
+        devices.DEVICE_COOKIE,
+        device_token,
+        max_age=devices.DEVICE_COOKIE_DAYS * 86400,
         **_cookie_args(),  # type: ignore[arg-type]
     )
     return response

@@ -8,11 +8,11 @@ the body, which is only shown after login.
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +34,7 @@ from app.models import (
     User,
 )
 from app.schemas.notifications import ChannelPrefs, NotificationOut, PreferenceOut
+from app.services import reports
 from app.services.document_rules import RULES
 
 CHANNELS = ("in_app", "email")
@@ -45,6 +46,9 @@ DEFAULTS: dict[NotificationEvent, dict[str, bool]] = {
     NotificationEvent.INVOICE_OVERDUE: {"in_app": True, "email": True},
     NotificationEvent.EMAIL_FAILED: {"in_app": True, "email": True},
     NotificationEvent.MEMBER_JOINED: {"in_app": True, "email": False},
+    # A summary is an email; in the app the dashboard already shows the same numbers.
+    NotificationEvent.DAILY_SUMMARY: {"in_app": False, "email": True},
+    NotificationEvent.NEW_DEVICE_LOGIN: {"in_app": True, "email": True},
 }
 
 MANAGERS = frozenset({Role.OWNER, Role.ADMIN})
@@ -54,6 +58,8 @@ EVENT_ROLES: dict[NotificationEvent, frozenset[Role]] = {
     NotificationEvent.INVOICE_OVERDUE: MANAGERS | {Role.ACCOUNTANT},
     NotificationEvent.MEMBER_JOINED: MANAGERS,
     NotificationEvent.EMAIL_FAILED: frozenset(),  # only the person who sent it
+    NotificationEvent.DAILY_SUMMARY: MANAGERS | {Role.ACCOUNTANT},
+    NotificationEvent.NEW_DEVICE_LOGIN: frozenset(),  # the account holder (see devices.py)
 }
 
 
@@ -68,6 +74,10 @@ class Message:
     # Always included (e.g. the sender of a failed email); never excluded as the actor.
     direct_user_id: uuid.UUID | None = None
     actor_user_id: uuid.UUID | None = None
+    # Label/value rows added to the email (only for messages meant to carry figures).
+    details: tuple[tuple[str, str], ...] = ()
+    # The email's first line; "{business}" is replaced with the business name.
+    intro: str | None = None
 
 
 def format_ils(value: Any) -> str:
@@ -171,8 +181,68 @@ def _from_member_joined(event_id: uuid.UUID, payload: dict[str, Any]) -> Message
     )
 
 
+def _documents(count: int) -> str:
+    return "מסמך אחד" if count == 1 else f"{count} מסמכים"
+
+
+def _he_date(day: date) -> str:
+    return day.strftime("%d/%m/%Y")
+
+
+async def _from_daily_summary(
+    session: AsyncSession, business_id: uuid.UUID, payload: dict[str, Any]
+) -> Message | None:
+    day = date.fromisoformat(payload["day"])
+    summary = await reports.daily_summary_for(session, business_id, day)
+    issued_total = sum(summary.issued.values())
+    if issued_total == 0 and summary.open_balance <= 0:
+        return None  # a quiet day with nothing owed: no email
+    issued_text = (
+        ", ".join(
+            f"{count} {RULES[doc_type].title_he}"
+            for doc_type, count in sorted(summary.issued.items(), key=lambda kv: -kv[1])
+        )
+        or "לא הופקו מסמכים"
+    )
+    details: list[tuple[str, str]] = [("מסמכים שהופקו", issued_text)]
+    if summary.vat_registered:
+        details += [
+            ("הכנסות לפני מע״מ", format_ils(summary.income_net)),
+            ("מע״מ עסקאות", format_ils(summary.income_vat)),
+        ]
+    details += [
+        ("תקבולים", format_ils(summary.received)),
+        (
+            "יתרות פתוחות",
+            f"{format_ils(summary.open_balance)} ({_documents(summary.open_documents)})",
+        ),
+        (
+            "מתוכן באיחור",
+            f"{format_ils(summary.overdue_balance)} ({_documents(summary.overdue_documents)})",
+        ),
+    ]
+    return Message(
+        event=NotificationEvent.DAILY_SUMMARY,
+        title=f"סיכום יומי ל-{_he_date(day)}",
+        body=(
+            f"הופקו {_documents(issued_total)}, התקבלו {format_ils(summary.received)}. "
+            f"יתרות פתוחות {format_ils(summary.open_balance)}, "
+            f"מתוכן באיחור {format_ils(summary.overdue_balance)}."
+        ),
+        link="/",
+        dedupe_key=f"summary:{day.isoformat()}",
+        roles=EVENT_ROLES[NotificationEvent.DAILY_SUMMARY],
+        details=tuple(details),
+        intro="סיכום הפעילות בעסק {business} ביום " + _he_date(day) + ":",
+    )
+
+
 async def message_for(
-    session: AsyncSession, event_id: uuid.UUID, event_type: str, payload: dict[str, Any]
+    session: AsyncSession,
+    business_id: uuid.UUID,
+    event_id: uuid.UUID,
+    event_type: str,
+    payload: dict[str, Any],
 ) -> Message | None:
     if event_type == "document.issued":
         return _from_document_issued(event_id, payload)
@@ -182,6 +252,8 @@ async def message_for(
         return _from_email_failed(payload)
     if event_type == "member.joined":
         return _from_member_joined(event_id, payload)
+    if event_type == "business.daily_summary":
+        return await _from_daily_summary(session, business_id, payload)
     return None  # not every event notifies anyone
 
 
@@ -255,7 +327,16 @@ async def deliver(session: AsyncSession, business_id: uuid.UUID, message: Messag
         link = f"{get_settings().public_url.rstrip('/')}{message.link}"
         for address in emails:
             email = notification_email(
-                to=address, business_name=business.display_name, title=message.title, link=link
+                to=address,
+                business_name=business.display_name,
+                title=message.title,
+                link=link,
+                details=message.details,
+                intro=(
+                    message.intro.replace("{business}", business.display_name)
+                    if message.intro
+                    else None
+                ),
             )
 
             async def send(email: Any = email) -> None:
@@ -275,9 +356,10 @@ async def deliver(session: AsyncSession, business_id: uuid.UUID, message: Messag
 
 
 def _inbox(ctx: BusinessContext) -> list[Any]:
+    # This business's notifications, plus account-level ones (shown in every business).
     return [
         Notification.user_id == ctx.principal.user_id,
-        Notification.business_id == ctx.business_id,
+        or_(Notification.business_id == ctx.business_id, Notification.business_id.is_(None)),
     ]
 
 

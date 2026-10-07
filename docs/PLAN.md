@@ -329,6 +329,8 @@ outbox_events ──► worker ──► dispatcher (reads notification_preferen
 | `invoice_overdue` (once, the day after the due date or issue date, if still open) | owner, admin, accountant | yes |
 | `email_failed` (a document email gave up after all retries) | the sender | yes |
 | `member_joined` | owner, admin | no |
+| `daily_summary` (07:30: yesterday's documents, income, money received; open and overdue balances; skipped on a quiet day with nothing owed) | owner, admin, accountant | yes (email only by default; it includes amounts) |
+| `new_device_login` (sign-in from a browser the account has not used; the first one is silent) | the account holder, in every business | yes |
 
 - The person who caused an event is not notified, unless an AI assistant acted for them.
 - The worker leases outbox events through a database function (`claim_outbox_events`), so
@@ -338,6 +340,9 @@ outbox_events ──► worker ──► dispatcher (reads notification_preferen
   notifications only for members of the business, and cannot read them.
 - Email titles carry no amounts or customer names; details are shown after login.
 - Read notifications are deleted after 180 days, handled events after 30 days.
+- Devices are recognised by a long-lived random cookie (only its hash is stored, in
+  `user_devices`, readable only by its owner). Profile lists them; removing one makes the next
+  sign-in from it count as new. Clearing cookies or a private window also counts as new.
 - The bell polls every 30 seconds (and on window focus); SSE can replace polling later.
 
 ---
@@ -431,7 +436,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M2** ✅ | Catalog | Customers and items: CRUD, search, UI, MCP tools |
 | **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
 | **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links, documents emailed to customers (PDF attached, logo inline, retries, delivery history) |
-| **M5** | Notifications | ✅ in-app inbox (bell), email notifications, preferences screen, MCP tools, outbox dispatcher, daily overdue check; remaining: PWA + Web Push to phones (needs HTTPS, after M1b), new-device login alert, daily summary |
+| **M5** | Notifications | ✅ in-app inbox (bell), email notifications, preferences screen, MCP tools, outbox dispatcher, daily overdue check; new-device sign-in alerts, daily summary email; remaining: PWA + Web Push to phones (needs HTTPS, after M1b) |
 | **M6** | Israeli compliance | OPENFRMT export; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
 | **M7** | Reports and dashboard | ✅ income and VAT per period (taxable / zero-rated / exempt), money received by payment method, open balances with aging, Excel export, dashboard figures and 12-month chart, MCP `get_report` |
 | **M8** | Production hardening | Azure staging + production, observability, backups/restore drill, load test, security review and pen test, privacy policy and terms |

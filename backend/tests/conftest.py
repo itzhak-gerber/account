@@ -33,6 +33,7 @@ from tests.fake_idp import FakeIdP
 TABLES = [
     "notifications",
     "notification_preferences",
+    "user_devices",
     "outbox_events",
     "document_relations",
     "document_payments",

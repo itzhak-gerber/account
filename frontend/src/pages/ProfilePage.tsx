@@ -14,6 +14,7 @@ import { useLocation } from "react-router";
 
 import { api, startLogin } from "../api/client";
 import { useSession } from "../auth/context";
+import { DevicesCard } from "../features/notifications/DevicesCard";
 import { PreferencesCard } from "../features/notifications/PreferencesCard";
 import { errorMessage } from "../lib/errors";
 
@@ -87,6 +88,7 @@ export function ProfilePage() {
           </Stack>
         </CardContent>
       </Card>
+      <DevicesCard />
     </Stack>
   );
 }

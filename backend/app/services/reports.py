@@ -1,6 +1,7 @@
 """Reports over issued documents. Amounts come from the stored, issued totals (never recomputed),
 so a report always matches the documents the customer received."""
 
+import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -24,6 +25,7 @@ from app.schemas.reports import (
     AgingBucket,
     AgingTotals,
     CustomerBalance,
+    DailySummary,
     Dashboard,
     IncomeDocument,
     IncomeMonth,
@@ -80,9 +82,9 @@ def _months(date_from: date, date_to: date) -> list[date]:
     return months
 
 
-def _issued(ctx: BusinessContext, types: tuple[DocumentType, ...]) -> list[ColumnElement[bool]]:
+def _issued(business_id: uuid.UUID, types: tuple[DocumentType, ...]) -> list[ColumnElement[bool]]:
     return [
-        Document.business_id == ctx.business_id,
+        Document.business_id == business_id,
         Document.status == DocumentStatus.ISSUED,
         Document.type.in_(types),
     ]
@@ -105,6 +107,13 @@ async def income(
     session: AsyncSession, ctx: BusinessContext, date_from: date, date_to: date
 ) -> IncomeReport:
     require(ctx.role, Permission.VIEW_REPORTS)
+    return await income_for(session, ctx.business_id, date_from, date_to)
+
+
+async def income_for(
+    session: AsyncSession, business_id: uuid.UUID, date_from: date, date_to: date
+) -> IncomeReport:
+    """The income report for one business, without a permission check (internal use)."""
     _check_period(date_from, date_to)
 
     def line_sum(vat_type: VatType) -> ColumnElement[Decimal]:
@@ -140,7 +149,7 @@ async def income(
         )
         .outerjoin(lines, lines.c.document_id == Document.id)
         .where(
-            *_issued(ctx, SALES),
+            *_issued(business_id, SALES),
             Document.issue_date >= date_from,
             Document.issue_date <= date_to,
         )
@@ -220,6 +229,12 @@ async def receipts(
     session: AsyncSession, ctx: BusinessContext, date_from: date, date_to: date
 ) -> ReceiptsReport:
     require(ctx.role, Permission.VIEW_REPORTS)
+    return await receipts_for(session, ctx.business_id, date_from, date_to)
+
+
+async def receipts_for(
+    session: AsyncSession, business_id: uuid.UUID, date_from: date, date_to: date
+) -> ReceiptsReport:
     _check_period(date_from, date_to)
     rows = await session.execute(
         select(
@@ -233,7 +248,7 @@ async def receipts(
         )
         .join(DocumentPayment, DocumentPayment.document_id == Document.id)
         .where(
-            *_issued(ctx, RECEIPTS),
+            *_issued(business_id, RECEIPTS),
             Document.issue_date >= date_from,
             Document.issue_date <= date_to,
         )
@@ -294,8 +309,14 @@ def _add_open(totals: AgingTotals, row: OpenDocument) -> None:
 async def open_balances(
     session: AsyncSession, ctx: BusinessContext, as_of: date | None = None
 ) -> OpenBalancesReport:
-    """What customers owe now. Without a due date, a document is due on its issue date."""
     require(ctx.role, Permission.VIEW_REPORTS)
+    return await open_balances_for(session, ctx.business_id, as_of)
+
+
+async def open_balances_for(
+    session: AsyncSession, business_id: uuid.UUID, as_of: date | None = None
+) -> OpenBalancesReport:
+    """What customers owe now. Without a due date, a document is due on its issue date."""
     as_of = as_of or today()
     balance = Document.total - Document.amount_paid - Document.amount_credited
     rows = await session.execute(
@@ -312,7 +333,7 @@ async def open_balances(
             balance,
         )
         .where(
-            *_issued(ctx, tuple(PAYABLE)),
+            *_issued(business_id, tuple(PAYABLE)),
             Document.superseded_by_id.is_(None),
             balance > 0,
         )
@@ -388,4 +409,44 @@ async def dashboard(session: AsyncSession, ctx: BusinessContext) -> Dashboard:
         overdue_balance=sum((d.balance for d in overdue), money(ZERO)),
         overdue_documents=len(overdue),
         income_by_month=series,
+    )
+
+
+# --- daily summary ---------------------------------------------------------------------
+
+
+async def daily_summary_for(
+    session: AsyncSession, business_id: uuid.UUID, day: date
+) -> DailySummary:
+    """What happened on ``day`` and where the business stands now (for the morning email)."""
+    business = await session.get(Business, business_id)
+    assert business is not None
+    counts = dict(
+        (
+            await session.execute(
+                select(Document.type, func.count())
+                .where(
+                    Document.business_id == business_id,
+                    Document.status == DocumentStatus.ISSUED,
+                    Document.issue_date == day,
+                )
+                .group_by(Document.type)
+            )
+        ).all()
+    )
+    sales = await income_for(session, business_id, day, day)
+    received = await receipts_for(session, business_id, day, day)
+    balances = await open_balances_for(session, business_id, today())
+    overdue = [d for d in balances.documents if d.bucket != "current"]
+    return DailySummary(
+        day=day,
+        vat_registered=BusinessType(business.business_type) in VAT_REGISTERED,
+        issued={DocumentType(t): n for t, n in counts.items()},
+        income_net=sales.totals.net,
+        income_vat=sales.totals.vat,
+        received=received.totals.total,
+        open_balance=balances.totals.balance,
+        open_documents=balances.totals.documents,
+        overdue_balance=sum((d.balance for d in overdue), money(ZERO)),
+        overdue_documents=len(overdue),
     )
