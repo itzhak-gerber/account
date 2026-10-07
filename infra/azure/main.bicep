@@ -26,6 +26,12 @@ param smtpPrincipalId string
 param emailRoleId string
 @description('Image tag (git commit) to run. Required for the job and apps stages.')
 param imageTag string = ''
+@description('PostgreSQL compute size; capacity for small sizes varies by region and subscription.')
+param postgresSku string = 'Standard_B1ms'
+@allowed(['Burstable', 'GeneralPurpose'])
+param postgresTier string = 'Burstable'
+@description('Availability zone for PostgreSQL ("1", "2", "3"), or empty to let Azure choose.')
+param postgresZone string = ''
 
 var tags = {
   app: prefix
@@ -37,7 +43,7 @@ var smtpUsername = '${prefix}-${envName}-smtp'
 
 // Built-in role ids.
 var roles = {
-  acrPull: '7f951dca-d7ab-4bb7-a29b-43e3eb3f2a78'
+  acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
   blobDataContributor: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
   keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
 }
@@ -145,6 +151,9 @@ module postgres 'modules/postgres.bicep' = {
     privateDnsZoneId: postgresDns.id
     adminLogin: adminLogin
     adminPassword: vault.getSecret('pg-admin-password')
+    sku: postgresSku
+    tier: postgresTier
+    zone: postgresZone
     tags: tags
   }
   dependsOn: [postgresDnsLink]
@@ -260,9 +269,10 @@ resource smtpRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 }
 
 // Links that app to the resource; the SMTP login is this username + the app's secret.
+// (Azure requires the resource name to differ from the username.)
 resource smtpUser 'Microsoft.Communication/communicationServices/smtpUsernames@2025-09-01' = {
   parent: communication
-  name: smtpUsername
+  name: 'smtp-app'
   properties: {
     username: smtpUsername
     entraApplicationId: smtpAppId

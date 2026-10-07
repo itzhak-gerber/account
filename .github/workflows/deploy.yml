@@ -26,6 +26,10 @@ jobs:
       SMTP_APP_ID: ${{ fromJSON(vars.AZURE_ENV).smtpAppId }}
       SMTP_PRINCIPAL_ID: ${{ fromJSON(vars.AZURE_ENV).smtpPrincipalId }}
       TAG: ${{ github.sha }}
+      # Optional AZURE_ENV fields, for when the default database size has no capacity.
+      PG_SKU: ${{ fromJSON(vars.AZURE_ENV).postgresSku || 'Standard_B1ms' }}
+      PG_TIER: ${{ fromJSON(vars.AZURE_ENV).postgresTier || 'Burstable' }}
+      PG_ZONE: ${{ fromJSON(vars.AZURE_ENV).postgresZone || '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -41,11 +45,24 @@ jobs:
       - name: Database running (it may have been paused)
         run: |
           server=$(az postgres flexible-server list --resource-group "$RG" --query "[0].name" -o tsv)
-          if [ -n "$server" ] && [ "$(az postgres flexible-server show --resource-group "$RG" \
-              --name "$server" --query state -o tsv)" = "Stopped" ]; then
-            echo "starting $server"
-            az postgres flexible-server start --resource-group "$RG" --name "$server" -o none
-          fi
+          [ -n "$server" ] || exit 0
+          state=$(az postgres flexible-server show --resource-group "$RG" --name "$server" \
+            --query state -o tsv || true)
+          echo "$server: ${state:-unknown}"
+          case "$state" in
+            Stopped)
+              az postgres flexible-server start --resource-group "$RG" --name "$server" -o none ;;
+            Ready|Starting|Updating|Stopping) ;;
+            *)
+              # A server whose creation failed (e.g. no capacity) blocks a retry. Remove it,
+              # but only if the app's database was never created on it.
+              if ! az postgres flexible-server db show --resource-group "$RG" \
+                  --server-name "$server" --database-name invoice -o none 2>/dev/null; then
+                echo "removing $server (creation failed, no data)"
+                az postgres flexible-server delete --resource-group "$RG" --name "$server" \
+                  --yes -o none
+              fi ;;
+          esac
 
       - name: Secrets exist in Key Vault (generated once, never printed)
         run: |
@@ -68,6 +85,7 @@ jobs:
             --template-file infra/azure/main.bicep \
             --parameters stage=base keyVaultName="$VAULT" smtpAppId="$SMTP_APP_ID" \
                          smtpPrincipalId="$SMTP_PRINCIPAL_ID" emailRoleId="$email_role" \
+                         postgresSku="$PG_SKU" postgresTier="$PG_TIER" postgresZone="$PG_ZONE" \
             --query properties.outputs -o json > base.json
           echo "registry=$(jq -r .registryName.value base.json)" >> "$GITHUB_OUTPUT"
           echo "login_server=$(jq -r .registryLoginServer.value base.json)" >> "$GITHUB_OUTPUT"
@@ -93,7 +111,8 @@ jobs:
             --template-file infra/azure/main.bicep \
             --parameters stage=job imageTag="$TAG" keyVaultName="$VAULT" \
                          smtpAppId="$SMTP_APP_ID" smtpPrincipalId="$SMTP_PRINCIPAL_ID" \
-                         emailRoleId="$EMAIL_ROLE" -o none
+                         emailRoleId="$EMAIL_ROLE" postgresSku="$PG_SKU" \
+                         postgresTier="$PG_TIER" postgresZone="$PG_ZONE" -o none
           execution=$(az containerapp job start --name migrate --resource-group "$RG" \
             --query name -o tsv)
           echo "execution: $execution"
@@ -119,7 +138,8 @@ jobs:
             --template-file infra/azure/main.bicep \
             --parameters stage=apps imageTag="$TAG" keyVaultName="$VAULT" \
                          smtpAppId="$SMTP_APP_ID" smtpPrincipalId="$SMTP_PRINCIPAL_ID" \
-                         emailRoleId="$EMAIL_ROLE" \
+                         emailRoleId="$EMAIL_ROLE" postgresSku="$PG_SKU" \
+                         postgresTier="$PG_TIER" postgresZone="$PG_ZONE" \
             --query properties.outputs -o json > apps.json
           echo "app_url=$(jq -r .appUrl.value apps.json)" >> "$GITHUB_OUTPUT"
           echo "auth_url=$(jq -r .authUrl.value apps.json)" >> "$GITHUB_OUTPUT"

@@ -58,6 +58,16 @@ and the database stops; data is kept. **Resume dev environment** brings everythi
 about 5 minutes (any deploy resumes it too). Azure restarts a stopped database by itself after
 7 days. Both also work from the GitHub mobile app.
 
+## If the database cannot be created ("no capacity")
+
+Small database sizes are sometimes unavailable in a region for new subscriptions
+(`RegionalAllocationFailed`). Add optional fields to the `AZURE_ENV` variable to pick another
+size or zone, then re-run the deploy; a server whose creation failed is removed first:
+
+```json
+"postgresSku": "Standard_B2s", "postgresTier": "Burstable", "postgresZone": "2"
+```
+
 ## Useful commands (Cloud Shell)
 
 ```bash

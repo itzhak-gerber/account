@@ -6,6 +6,9 @@ param privateDnsZoneId string
 param adminLogin string
 @secure()
 param adminPassword string
+param sku string
+param tier string
+param zone string
 param tags object
 
 resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
@@ -13,11 +16,12 @@ resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   location: location
   tags: tags
   sku: {
-    name: 'Standard_B1ms' // burstable: the cheapest tier, fine for a test environment
-    tier: 'Burstable'
+    name: sku // dev default Standard_B1ms (burstable): the cheapest, fine for testing
+    tier: tier
   }
   properties: {
     version: '16'
+    availabilityZone: empty(zone) ? null : zone
     administratorLogin: adminLogin
     administratorLoginPassword: adminPassword
     storage: {
