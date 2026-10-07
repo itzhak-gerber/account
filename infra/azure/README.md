@@ -58,15 +58,20 @@ and the database stops; data is kept. **Resume dev environment** brings everythi
 about 5 minutes (any deploy resumes it too). Azure restarts a stopped database by itself after
 7 days. Both also work from the GitHub mobile app.
 
-## If the database cannot be created ("no capacity")
+## Database size and "no capacity"
 
-Small database sizes are sometimes unavailable in a region for new subscriptions
-(`RegionalAllocationFailed`). Add optional fields to the `AZURE_ENV` variable to pick another
-size or zone, then re-run the deploy; a server whose creation failed is removed first:
+Small database sizes are often unavailable in Sweden Central for new subscriptions
+(`RegionalAllocationFailed`). When it creates the server, the deploy tries, in order:
+B1ms in zones 2 and 3, then B2s in zones 1, 2 and 3. It moves on only for that error. Later
+deploys keep the existing server's size. To force a size or zone, add optional fields to the
+`AZURE_ENV` variable:
 
 ```json
-"postgresSku": "Standard_B2s", "postgresTier": "Burstable", "postgresZone": "2"
+"postgresSku": "Standard_B1ms", "postgresTier": "Burstable", "postgresZone": "2"
 ```
+
+To scale an existing server down later (e.g. B2s to B1ms when capacity allows), use Cloud Shell:
+`az postgres flexible-server update -g rg-invoice-dev -n <server> --sku-name Standard_B1ms`.
 
 ## Useful commands (Cloud Shell)
 

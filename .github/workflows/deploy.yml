@@ -26,11 +26,11 @@ jobs:
       SMTP_APP_ID: ${{ fromJSON(vars.AZURE_ENV).smtpAppId }}
       SMTP_PRINCIPAL_ID: ${{ fromJSON(vars.AZURE_ENV).smtpPrincipalId }}
       TAG: ${{ github.sha }}
-      # Optional AZURE_ENV fields, for when the default database size or zone has no capacity
-      # (zone 1: Sweden Central had no B1ms capacity when Azure picked the zone).
-      PG_SKU: ${{ fromJSON(vars.AZURE_ENV).postgresSku || 'Standard_B1ms' }}
-      PG_TIER: ${{ fromJSON(vars.AZURE_ENV).postgresTier || 'Burstable' }}
-      PG_ZONE: ${{ fromJSON(vars.AZURE_ENV).postgresZone || '1' }}
+      # Optional AZURE_ENV fields to force a database size/zone; otherwise the deploy picks the
+      # first with capacity (small sizes are often full in Sweden Central for new subscriptions).
+      PG_SKU_OVERRIDE: ${{ fromJSON(vars.AZURE_ENV).postgresSku || '' }}
+      PG_TIER_OVERRIDE: ${{ fromJSON(vars.AZURE_ENV).postgresTier || '' }}
+      PG_ZONE_OVERRIDE: ${{ fromJSON(vars.AZURE_ENV).postgresZone || '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -82,14 +82,44 @@ jobs:
           email_role=$(az role definition list --name "Communication and Email Service Owner" \
             --query "[0].name" -o tsv)
           echo "EMAIL_ROLE=$email_role" >> "$GITHUB_ENV"
-          az deployment group create --resource-group "$RG" --name "base-$GITHUB_RUN_ID" \
-            --template-file infra/azure/main.bicep \
-            --parameters stage=base keyVaultName="$VAULT" smtpAppId="$SMTP_APP_ID" \
-                         smtpPrincipalId="$SMTP_PRINCIPAL_ID" emailRoleId="$email_role" \
-                         postgresSku="$PG_SKU" postgresTier="$PG_TIER" postgresZone="$PG_ZONE" \
-            --query properties.outputs -o json > base.json
-          echo "registry=$(jq -r .registryName.value base.json)" >> "$GITHUB_OUTPUT"
-          echo "login_server=$(jq -r .registryLoginServer.value base.json)" >> "$GITHUB_OUTPUT"
+
+          # Database size/zone: keep an existing server's; else the override; else try the
+          # cheapest first and move on only when Azure has no capacity for it.
+          existing=$(az postgres flexible-server list --resource-group "$RG" \
+            --query "[?state=='Ready' || state=='Stopped' || state=='Starting' || state=='Stopping' || state=='Updating'] | [0].[sku.name, sku.tier, availabilityZone]" \
+            -o tsv | tr '\t' ':')
+          if [ -n "$existing" ]; then
+            candidates=("$existing")
+          elif [ -n "$PG_SKU_OVERRIDE" ]; then
+            candidates=("$PG_SKU_OVERRIDE:${PG_TIER_OVERRIDE:-Burstable}:$PG_ZONE_OVERRIDE")
+          else
+            candidates=(Standard_B1ms:Burstable:2 Standard_B1ms:Burstable:3
+                        Standard_B2s:Burstable:1 Standard_B2s:Burstable:2 Standard_B2s:Burstable:3)
+          fi
+
+          for candidate in "${candidates[@]}"; do
+            IFS=: read -r sku tier zone <<<"$candidate"
+            echo "database: $sku ($tier), zone ${zone:-any}"
+            if az deployment group create --resource-group "$RG" --name "base-$GITHUB_RUN_ID" \
+                --template-file infra/azure/main.bicep \
+                --parameters stage=base keyVaultName="$VAULT" smtpAppId="$SMTP_APP_ID" \
+                             smtpPrincipalId="$SMTP_PRINCIPAL_ID" emailRoleId="$email_role" \
+                             postgresSku="$sku" postgresTier="$tier" postgresZone="$zone" \
+                --query properties.outputs -o json > base.json 2> error.txt; then
+              {
+                echo "PG_SKU=$sku"
+                echo "PG_TIER=$tier"
+                echo "PG_ZONE=$zone"
+              } >> "$GITHUB_ENV"
+              echo "registry=$(jq -r .registryName.value base.json)" >> "$GITHUB_OUTPUT"
+              echo "login_server=$(jq -r .registryLoginServer.value base.json)" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            cat error.txt
+            if ! grep -q RegionalAllocationFailed error.txt; then exit 1; fi
+            echo "no capacity for $sku in zone ${zone:-any}, trying the next option"
+          done
+          echo "no database size/zone had capacity"; exit 1
 
       - name: Build and push images
         env:
