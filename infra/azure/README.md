@@ -75,6 +75,8 @@ the existing server's size. Optional `AZURE_ENV` fields override the choices:
 
 Moving to another region creates new network/database/apps resources (their names include a
 region-specific suffix); the old region's are left as they are and can be removed by hand.
+A trial subscription allows only **one** Container Apps environment, so the old one must be
+deleted first (`az containerapp env delete -g rg-invoice-dev -n <old environment> --yes`).
 
 To scale an existing server down later (e.g. B2s to B1ms when capacity allows), use Cloud Shell:
 `az postgres flexible-server update -g rg-invoice-dev -n <server> --sku-name Standard_B1ms`.
