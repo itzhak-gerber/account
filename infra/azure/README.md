@@ -17,6 +17,16 @@ Israel Central yet, and West Europe was not accepting new trial subscriptions):
 | Images | Container Registry (Basic) | |
 | Logs | Log Analytics | 30 days |
 
+## Current environment
+
+| | |
+|---|---|
+| Subscription | Azure subscription 1 (`fb8aa579-e262-4701-834f-bb69d81db963`) |
+| Region | Sweden Central (`swedencentral`) |
+| Resource group | `rg-invoice-dev` |
+| Key Vault | `kv-invoice-dev-0d5e33` |
+| GitHub variable | `AZURE_ENV` (identifiers only, set from `bootstrap.sh` output) |
+
 ## One-time setup
 
 1. In the Azure portal open **Cloud Shell** (`>_` at the top), choose **Bash**.
