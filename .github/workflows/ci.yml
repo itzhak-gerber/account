@@ -34,9 +34,6 @@ jobs:
         ports: ["6379:6379"]
         options: >-
           --health-cmd "redis-cli ping" --health-interval 3s --health-retries 20
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite
-        ports: ["10000:10000"]
     env:
       APP_ENVIRONMENT: test
       # Tests connect as the restricted app role so row-level security is exercised.
@@ -71,6 +68,12 @@ jobs:
           uv run alembic downgrade base
           uv run alembic upgrade head
           uv run alembic check
+      - name: Start the Azure Storage emulator (Azurite)
+        # Started here, not as a service container, to pass --skipApiVersionCheck: the Azure SDK
+        # can be newer than the emulator image.
+        run: |
+          docker run -d --name azurite -p 10000:10000 mcr.microsoft.com/azure-storage/azurite \
+            azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck
       - run: uv run pytest -q
 
   frontend:
