@@ -1,7 +1,10 @@
 # Azure "dev" environment
 
-Everything runs in one resource group in **Sweden Central** (Container Apps is not offered in
-Israel Central yet, and West Europe was not accepting new trial subscriptions):
+One resource group, `rg-invoice-dev`, in **Sweden Central** (Container Apps is not offered in
+Israel Central yet, and West Europe was not accepting new trial subscriptions). The network,
+database and apps run in **North Europe** (Ireland), because Sweden Central refused every
+database size to this subscription; registry, storage, Key Vault, identity and logs stay in
+Sweden Central and are used from there:
 
 | Part | Azure service | Notes |
 |---|---|---|
@@ -22,7 +25,7 @@ Israel Central yet, and West Europe was not accepting new trial subscriptions):
 | | |
 |---|---|
 | Subscription | Azure subscription 1 (`fb8aa579-e262-4701-834f-bb69d81db963`) |
-| Region | Sweden Central (`swedencentral`) |
+| Region | Sweden Central (`swedencentral`); network, database and apps in North Europe (`northeurope`) |
 | Resource group | `rg-invoice-dev` |
 | Key Vault | `kv-invoice-dev-0d5e33` |
 | GitHub variable | `AZURE_ENV` (identifiers only, set from `bootstrap.sh` output) |
@@ -58,17 +61,20 @@ and the database stops; data is kept. **Resume dev environment** brings everythi
 about 5 minutes (any deploy resumes it too). Azure restarts a stopped database by itself after
 7 days. Both also work from the GitHub mobile app.
 
-## Database size and "no capacity"
+## Database size, region and "no capacity"
 
-Small database sizes are often unavailable in Sweden Central for new subscriptions
-(`RegionalAllocationFailed`). When it creates the server, the deploy tries, in order:
-B1ms in zones 2 and 3, then B2s in zones 1, 2 and 3. It moves on only for that error. Later
-deploys keep the existing server's size. To force a size or zone, add optional fields to the
-`AZURE_ENV` variable:
+New subscriptions are often refused small database servers in some regions, reported as
+`RegionalAllocationFailed` ("no capacity"). In Sweden Central every size and zone was refused,
+so the network, database and apps moved to North Europe. When it creates the server, the deploy
+tries B1ms (any zone, then zone 1), then B2s, moving on only for that error. Later deploys keep
+the existing server's size. Optional `AZURE_ENV` fields override the choices:
 
 ```json
-"postgresSku": "Standard_B1ms", "postgresTier": "Burstable", "postgresZone": "2"
+"computeLocation": "germanywestcentral", "postgresSku": "Standard_B1ms", "postgresZone": "2"
 ```
+
+Moving to another region creates new network/database/apps resources (their names include a
+region-specific suffix); the old region's are left as they are and can be removed by hand.
 
 To scale an existing server down later (e.g. B2s to B1ms when capacity allows), use Cloud Shell:
 `az postgres flexible-server update -g rg-invoice-dev -n <server> --sku-name Standard_B1ms`.

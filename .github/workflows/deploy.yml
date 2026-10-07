@@ -31,6 +31,9 @@ jobs:
       PG_SKU_OVERRIDE: ${{ fromJSON(vars.AZURE_ENV).postgresSku || '' }}
       PG_TIER_OVERRIDE: ${{ fromJSON(vars.AZURE_ENV).postgresTier || '' }}
       PG_ZONE_OVERRIDE: ${{ fromJSON(vars.AZURE_ENV).postgresZone || '' }}
+      # Region for the network, database and apps (Sweden Central refused every database
+      # size to this subscription). Optional AZURE_ENV field to change it.
+      COMPUTE_LOCATION: ${{ fromJSON(vars.AZURE_ENV).computeLocation || 'northeurope' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -93,8 +96,7 @@ jobs:
           elif [ -n "$PG_SKU_OVERRIDE" ]; then
             candidates=("$PG_SKU_OVERRIDE:${PG_TIER_OVERRIDE:-Burstable}:$PG_ZONE_OVERRIDE")
           else
-            candidates=(Standard_B1ms:Burstable:2 Standard_B1ms:Burstable:3
-                        Standard_B2s:Burstable:1 Standard_B2s:Burstable:2 Standard_B2s:Burstable:3)
+            candidates=(Standard_B1ms:Burstable: Standard_B1ms:Burstable:1 Standard_B2s:Burstable:)
           fi
 
           for candidate in "${candidates[@]}"; do
@@ -105,6 +107,7 @@ jobs:
                 --parameters stage=base keyVaultName="$VAULT" smtpAppId="$SMTP_APP_ID" \
                              smtpPrincipalId="$SMTP_PRINCIPAL_ID" emailRoleId="$email_role" \
                              postgresSku="$sku" postgresTier="$tier" postgresZone="$zone" \
+                             computeLocation="$COMPUTE_LOCATION" \
                 --query properties.outputs -o json > base.json 2> error.txt; then
               {
                 echo "PG_SKU=$sku"
@@ -143,7 +146,8 @@ jobs:
             --parameters stage=job imageTag="$TAG" keyVaultName="$VAULT" \
                          smtpAppId="$SMTP_APP_ID" smtpPrincipalId="$SMTP_PRINCIPAL_ID" \
                          emailRoleId="$EMAIL_ROLE" postgresSku="$PG_SKU" \
-                         postgresTier="$PG_TIER" postgresZone="$PG_ZONE" -o none
+                         postgresTier="$PG_TIER" postgresZone="$PG_ZONE" \
+                         computeLocation="$COMPUTE_LOCATION" -o none
           execution=$(az containerapp job start --name migrate --resource-group "$RG" \
             --query name -o tsv)
           echo "execution: $execution"
@@ -171,6 +175,7 @@ jobs:
                          smtpAppId="$SMTP_APP_ID" smtpPrincipalId="$SMTP_PRINCIPAL_ID" \
                          emailRoleId="$EMAIL_ROLE" postgresSku="$PG_SKU" \
                          postgresTier="$PG_TIER" postgresZone="$PG_ZONE" \
+                         computeLocation="$COMPUTE_LOCATION" \
             --query properties.outputs -o json > apps.json
           echo "app_url=$(jq -r .appUrl.value apps.json)" >> "$GITHUB_OUTPUT"
           echo "auth_url=$(jq -r .authUrl.value apps.json)" >> "$GITHUB_OUTPUT"

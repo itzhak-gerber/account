@@ -14,6 +14,8 @@ targetScope = 'resourceGroup'
 @allowed(['base', 'job', 'apps'])
 param stage string = 'base'
 param location string = resourceGroup().location
+@description('Region for the network, database and apps (they must share one). Shared services (registry, storage, identity, logs) stay in the resource group\'s region.')
+param computeLocation string = location
 param prefix string = 'invoice'
 param envName string = 'dev'
 @description('Created by bootstrap.sh; holds every secret.')
@@ -38,6 +40,9 @@ var tags = {
   env: envName
 }
 var suffix = substring(uniqueString(resourceGroup().id), 0, 6)
+// Regional resources get their own suffix, so moving to another region creates new ones
+// instead of colliding with leftovers in the old region.
+var regionSuffix = substring(uniqueString(resourceGroup().id, computeLocation), 0, 6)
 var adminLogin = 'pgadmin'
 var smtpUsername = '${prefix}-${envName}-smtp'
 
@@ -88,8 +93,8 @@ resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
 // --- network ---------------------------------------------------------------------------
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
-  name: 'vnet-${prefix}-${envName}'
-  location: location
+  name: 'vnet-${prefix}-${envName}-${regionSuffix}'
+  location: computeLocation
   tags: tags
   properties: {
     addressSpace: { addressPrefixes: ['10.40.0.0/16'] }
@@ -122,7 +127,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
   }
 }
 
-var postgresName = 'pg-${prefix}-${envName}-${suffix}'
+var postgresName = 'pg-${prefix}-${envName}-${regionSuffix}'
 
 resource postgresDns 'Microsoft.Network/privateDnsZones@2024-06-01' = {
   name: '${postgresName}.private.postgres.database.azure.com'
@@ -145,7 +150,7 @@ resource postgresDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@
 module postgres 'modules/postgres.bicep' = {
   name: 'postgres'
   params: {
-    location: location
+    location: computeLocation
     name: postgresName
     subnetId: '${vnet.id}/subnets/snet-postgres'
     privateDnsZoneId: postgresDns.id
@@ -284,8 +289,8 @@ resource smtpUser 'Microsoft.Communication/communicationServices/smtpUsernames@2
 // --- Container Apps environment --------------------------------------------------------
 
 resource environment 'Microsoft.App/managedEnvironments@2025-01-01' = {
-  name: 'cae-${prefix}-${envName}'
-  location: location
+  name: 'cae-${prefix}-${envName}-${regionSuffix}'
+  location: computeLocation
   tags: tags
   properties: {
     appLogsConfiguration: {
@@ -314,7 +319,7 @@ resource environment 'Microsoft.App/managedEnvironments@2025-01-01' = {
 module job 'modules/job.bicep' = if (stage != 'base') {
   name: 'job'
   params: {
-    location: location
+    location: computeLocation
     tags: tags
     environmentId: environment.id
     identityId: identity.id
@@ -330,7 +335,7 @@ module job 'modules/job.bicep' = if (stage != 'base') {
 module apps 'modules/apps.bicep' = if (stage == 'apps') {
   name: 'apps'
   params: {
-    location: location
+    location: computeLocation
     tags: tags
     environmentId: environment.id
     defaultDomain: environment.properties.defaultDomain
@@ -347,6 +352,7 @@ module apps 'modules/apps.bicep' = if (stage == 'apps') {
   dependsOn: [registryPull, vaultSecretsUser, storageBlobContributor, smtpUser, filesContainer]
 }
 
+output computeLocation string = computeLocation
 output registryName string = registry.name
 output registryLoginServer string = registry.properties.loginServer
 output communicationServiceId string = communication.id
