@@ -165,4 +165,83 @@ describe("App", () => {
     expect(url).toBe("/api/v1/businesses/b1/invitations");
     expect((init!.headers as Record<string, string>)["X-CSRF-Token"]).toBe("csrf");
   });
+
+  it("shows this month's figures and the 12-month chart on the dashboard", async () => {
+    mockApi({
+      "/api/v1/me": () => json(me()),
+      "/api/v1/health": HEALTH,
+      "/api/v1/businesses/b1/reports/dashboard": () =>
+        json({
+          vat_registered: true,
+          month: "2026-10-01",
+          income_net: "1090.00",
+          income_vat: "196.20",
+          received: "0.00",
+          open_balance: "2286.20",
+          open_documents: 2,
+          overdue_balance: "1000.00",
+          overdue_documents: 1,
+          income_by_month: Array.from({ length: 12 }, (_, i) => ({
+            month: `2026-${String(i + 1).padStart(2, "0")}-01`,
+            amount: i === 9 ? "1090.00" : "0.00",
+          })),
+        }),
+    });
+
+    renderAt("/");
+
+    expect(await screen.findByText("הכנסות לפני מע״מ · החודש")).toBeInTheDocument();
+    expect(screen.getByText(/מתוכם באיחור: .*1,000\.00/)).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "הכנסות לפני מע״מ – 12 החודשים האחרונים" });
+    expect(within(table).getAllByRole("row")).toHaveLength(12);
+  });
+
+  it("shows the income report with VAT split and an Excel link for the chosen period", async () => {
+    const fetchMock = mockApi({
+      "/api/v1/me": () => json(me()),
+      "/api/v1/businesses/b1/reports/income": () =>
+        json({
+          date_from: "2026-10-01",
+          date_to: "2026-10-07",
+          totals: {
+            documents: 1,
+            taxable: "1000.00",
+            zero_rated: "200.00",
+            exempt: "300.00",
+            net: "1500.00",
+            vat: "180.00",
+            total: "1680.00",
+          },
+          months: [],
+          documents: [
+            {
+              id: "d1",
+              type: "tax_invoice",
+              number: 7,
+              issue_date: "2026-10-05",
+              customer_name: "לקוח בע״מ",
+              customer_tax_id: "",
+              taxable: "1000.00",
+              zero_rated: "200.00",
+              exempt: "300.00",
+              net: "1500.00",
+              vat: "180.00",
+              total: "1680.00",
+            },
+          ],
+        }),
+    });
+
+    renderAt("/reports");
+
+    const documents = await screen.findByRole("table", { name: "המסמכים" });
+    expect(within(documents).getByText("חשבונית מס 7")).toBeInTheDocument();
+    expect(screen.getAllByText(/500\.00/).length).toBeGreaterThan(0); // zero-rated + exempt
+    const url = String(fetchMock.mock.calls.find(([u]) => String(u).includes("/reports/"))![0]);
+    expect(url).toMatch(/date_from=\d{4}-\d{2}-01&date_to=/);
+    expect(screen.getByRole("link", { name: "הורדה לאקסל" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/\/reports\/income\.xlsx\?date_from=/),
+    );
+  });
 });

@@ -23,6 +23,7 @@ dependencies = [
     "jinja2>=3.1",
     "python-multipart>=0.0.20",
     "pillow>=11",
+    "openpyxl>=3.1.5",
 ]
 
 [dependency-groups]
@@ -32,6 +33,7 @@ dev = [
     "httpx>=0.28",
     "ruff>=0.13",
     "mypy>=1.18",
+    "types-openpyxl>=3.1.5.20260827",
 ]
 
 [build-system]

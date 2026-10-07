@@ -95,6 +95,10 @@ class Document(IdMixin, TimestampMixin, Base):
     # Updated after issue: receipts paying this invoice, and credit notes against it.
     amount_paid: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     amount_credited: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    # A proforma (חשבון עסקה) is closed once a tax invoice made from it is issued.
+    superseded_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="RESTRICT")
+    )
     notes: Mapped[str] = mapped_column(Text, default="")
     allocation_number: Mapped[str | None] = mapped_column(String(20))
     original_pdf_file_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("files.id"))

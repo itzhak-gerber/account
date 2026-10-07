@@ -1,3 +1,4 @@
+import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -10,12 +11,81 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router";
 
 import { api } from "../api/client";
-import type { DocumentSummary } from "../api/types";
+import type { Dashboard, DocumentSummary } from "../api/types";
+import { can } from "../auth/permissions";
+import { MonthlyColumns } from "../features/reports/MonthlyColumns";
+import { SummaryRow } from "../features/reports/SummaryRow";
+import { formatMoney } from "../lib/money";
 import { DocumentList } from "../features/documents/DocumentList";
 import { NewDocumentButton } from "../features/documents/NewDocumentButton";
 
 import { useSystemStatus } from "../api/system";
 import { useSession } from "../auth/context";
+
+function BusinessSummary({ businessId }: { businessId: string }) {
+  const { t } = useTranslation();
+  const { data } = useQuery({
+    queryKey: ["business", businessId, "reports", "dashboard"],
+    queryFn: () => api.get<Dashboard>(`/businesses/${businessId}/reports/dashboard`),
+  });
+  if (!data) return null;
+  const overdue = data.overdue_documents > 0;
+  const chartTitle = data.vat_registered
+    ? t("dashboard.incomeChart")
+    : t("dashboard.receivedChart");
+  return (
+    <Stack spacing={2}>
+      <SummaryRow
+        figures={[
+          ...(data.vat_registered
+            ? [
+                {
+                  label: `${t("dashboard.incomeNet")} · ${t("dashboard.thisMonth")}`,
+                  value: formatMoney(data.income_net),
+                },
+                {
+                  label: `${t("dashboard.vat")} · ${t("dashboard.thisMonth")}`,
+                  value: formatMoney(data.income_vat),
+                },
+              ]
+            : []),
+          {
+            label: `${t("dashboard.received")} · ${t("dashboard.thisMonth")}`,
+            value: formatMoney(data.received),
+          },
+          {
+            label: t("dashboard.openBalance"),
+            value: formatMoney(data.open_balance),
+            note: overdue ? (
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                <WarningAmberRounded fontSize="small" color="warning" />
+                <span>{t("dashboard.overdue", { amount: formatMoney(data.overdue_balance) })}</span>
+              </Stack>
+            ) : (
+              t("dashboard.openDocuments", { count: data.open_documents })
+            ),
+          },
+        ]}
+      />
+      <Card variant="outlined">
+        <CardContent>
+          <Stack
+            direction="row"
+            sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}
+          >
+            <Typography variant="h6" component="h2">
+              {chartTitle}
+            </Typography>
+            <Button component={RouterLink} to="/reports">
+              {t("dashboard.toReports")}
+            </Button>
+          </Stack>
+          <MonthlyColumns data={data.income_by_month} title={chartTitle} />
+        </CardContent>
+      </Card>
+    </Stack>
+  );
+}
 
 function StatusRow({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
@@ -62,6 +132,10 @@ export function DashboardPage() {
         </Box>
         <NewDocumentButton />
       </Stack>
+
+      {businessId && can(current?.role, "viewReports") && (
+        <BusinessSummary businessId={businessId} />
+      )}
 
       <Stack spacing={1}>
         <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>

@@ -8,7 +8,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, 
 from app.models import DocumentStatus, DocumentType, PaymentMethod, RelationType, VatType
 from app.schemas.catalog import OptionalTaxId, Text20, Text30, Text100, Text200, Text2000
 
-PaymentStatus = Literal["unpaid", "partial", "paid"]
+# superseded: a proforma replaced by the tax invoice issued from it.
+PaymentStatus = Literal["unpaid", "partial", "paid", "superseded"]
 Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
 PositiveMoney = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)]
 Quantity = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=3)]

@@ -110,6 +110,7 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
         {canEdit &&
           doc.payment_status &&
           doc.payment_status !== "paid" &&
+          doc.payment_status !== "superseded" &&
           ["tax_invoice", "proforma_invoice"].includes(doc.type) && (
             <Button
               variant="outlined"

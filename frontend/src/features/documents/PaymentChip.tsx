@@ -5,6 +5,13 @@ import type { PaymentStatus } from "../../api/types";
 
 export function PaymentChip({ status }: { status: PaymentStatus }) {
   const { t } = useTranslation();
-  const color = status === "paid" ? "success" : status === "partial" ? "warning" : "error";
+  const color =
+    status === "paid"
+      ? "success"
+      : status === "partial"
+        ? "warning"
+        : status === "superseded"
+          ? "default"
+          : "error";
   return <Chip size="small" color={color} label={t(`paymentStatus.${status}`)} />;
 }

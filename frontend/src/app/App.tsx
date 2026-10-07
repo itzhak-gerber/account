@@ -16,6 +16,7 @@ import { LandingPage } from "../pages/LandingPage";
 import { OnboardingPage } from "../pages/OnboardingPage";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { ProfilePage } from "../pages/ProfilePage";
+import { ReportsPage } from "../pages/ReportsPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { RtlThemeProvider } from "../theme/RtlThemeProvider";
 import { AppShell } from "./AppShell";
@@ -35,7 +36,7 @@ function AuthenticatedRoutes() {
   if (!me) return <LandingPage />;
 
   const hasBusiness = me.memberships.length > 0;
-  const built = ["/", "/settings", "/documents", "/customers", "/items"];
+  const built = ["/", "/settings", "/documents", "/customers", "/items", "/reports"];
   const placeholders = NAV_ITEMS.filter((item) => !built.includes(item.path));
 
   return (
@@ -52,6 +53,7 @@ function AuthenticatedRoutes() {
               <Route path="/documents/:documentId" element={<DocumentPage />} />
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/items" element={<ItemsPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
               {placeholders.map((item) => (
                 <Route
                   key={item.path}

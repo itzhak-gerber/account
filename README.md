@@ -53,6 +53,11 @@ You can also register new users from the login page; the verification email arri
 8. **שליחה במייל** on an issued document: emails it to the customer with the PDF attached.
    The document page shows each send and whether it went out. In development every email
    lands in Mailpit at http://localhost:8025 instead of a real inbox.
+9. **לוח בקרה** (Dashboard): this month's income, VAT and money received, what customers owe
+   (and how much is late), and a 12-month chart.
+10. **דוחות** (Reports): income and VAT for any period (presets include the last two-month VAT
+    period), money received by payment method, and open balances by customer with days late.
+    Each report downloads to Excel (**הורדה לאקסל**).
 
 ### Connecting an AI assistant (MCP)
 

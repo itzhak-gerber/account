@@ -18,6 +18,7 @@ class Permission(enum.StrEnum):
     VIEW_DOCUMENTS = "view_documents"
     EDIT_DRAFTS = "edit_drafts"
     ISSUE_DOCUMENTS = "issue_documents"
+    VIEW_REPORTS = "view_reports"
 
 
 _ALL = frozenset(Permission)
@@ -32,6 +33,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.VIEW_AUDIT_LOG,
             Permission.VIEW_CATALOG,
             Permission.VIEW_DOCUMENTS,
+            Permission.VIEW_REPORTS,
         }
     ),
     Role.MEMBER: frozenset(
@@ -43,6 +45,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.VIEW_DOCUMENTS,
             Permission.EDIT_DRAFTS,
             Permission.ISSUE_DOCUMENTS,
+            Permission.VIEW_REPORTS,
         }
     ),
     Role.VIEWER: frozenset(

@@ -162,7 +162,8 @@ export interface PaymentInput {
   details: PaymentDetails;
 }
 
-export type PaymentStatus = "unpaid" | "partial" | "paid";
+/** superseded: a proforma replaced by the tax invoice issued from it. */
+export type PaymentStatus = "unpaid" | "partial" | "paid" | "superseded";
 
 export interface AllocationInput {
   invoice_id: string;
@@ -250,4 +251,90 @@ export interface EmailDefaults {
   to: string[];
   subject: string;
   message: string;
+}
+
+// --- reports ------------------------------------------------------------------------
+
+export interface IncomeTotals {
+  documents: number;
+  taxable: string;
+  zero_rated: string;
+  exempt: string;
+  net: string;
+  vat: string;
+  total: string;
+}
+
+export interface IncomeReport {
+  date_from: string;
+  date_to: string;
+  totals: IncomeTotals;
+  months: (IncomeTotals & { month: string })[];
+  documents: (Omit<IncomeTotals, "documents"> & {
+    id: string;
+    type: DocumentType;
+    number: number;
+    issue_date: string;
+    customer_name: string;
+    customer_tax_id: string;
+  })[];
+}
+
+export interface ReceiptsTotals {
+  documents: number;
+  by_method: Partial<Record<PaymentMethod, string>>;
+  total: string;
+}
+
+export interface ReceiptsReport {
+  date_from: string;
+  date_to: string;
+  totals: ReceiptsTotals;
+  months: (ReceiptsTotals & { month: string })[];
+  documents: {
+    id: string;
+    type: DocumentType;
+    number: number;
+    issue_date: string;
+    customer_name: string;
+    by_method: Partial<Record<PaymentMethod, string>>;
+    total: string;
+  }[];
+}
+
+export type AgingBucket = "current" | "d1_30" | "d31_60" | "d61_90" | "d90_plus";
+
+export type AgingTotals = { documents: number; balance: string } & Record<AgingBucket, string>;
+
+export interface OpenBalancesReport {
+  as_of: string;
+  totals: AgingTotals;
+  customers: (AgingTotals & { customer_id: string | null; customer_name: string })[];
+  documents: {
+    id: string;
+    type: DocumentType;
+    number: number;
+    issue_date: string;
+    due_date: string;
+    customer_id: string | null;
+    customer_name: string;
+    total: string;
+    paid: string;
+    balance: string;
+    days_overdue: number;
+    bucket: AgingBucket;
+  }[];
+}
+
+export interface Dashboard {
+  vat_registered: boolean;
+  month: string;
+  income_net: string;
+  income_vat: string;
+  received: string;
+  open_balance: string;
+  open_documents: number;
+  overdue_balance: string;
+  overdue_documents: number;
+  income_by_month: { month: string; amount: string }[];
 }

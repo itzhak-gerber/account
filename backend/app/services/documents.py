@@ -229,6 +229,8 @@ PAYABLE = frozenset({DocumentType.TAX_INVOICE, DocumentType.PROFORMA_INVOICE})
 
 
 def balance_due(document: Document) -> Decimal:
+    if document.superseded_by_id is not None:
+        return ZERO  # the tax invoice issued from this proforma is what is owed now
     return document.total - document.amount_paid - document.amount_credited
 
 
@@ -239,6 +241,8 @@ def payment_status(document: Document) -> tuple[PaymentStatus | None, Decimal | 
         return "paid", money(ZERO)
     if document.type not in PAYABLE:
         return None, None
+    if document.superseded_by_id is not None:
+        return "superseded", money(ZERO)
     balance = balance_due(document)
     if balance <= ZERO:
         return "paid", money(ZERO)
@@ -428,6 +432,7 @@ async def list_documents(
         query = query.where(
             Document.status == DocumentStatus.ISSUED,
             Document.type.in_(PAYABLE),
+            Document.superseded_by_id.is_(None),
             Document.total - Document.amount_paid - Document.amount_credited > 0,
         )
     if q:
@@ -774,6 +779,31 @@ async def _apply_to_invoices(session: AsyncSession, document: Document) -> None:
         invoice.amount_paid += rel.amount or ZERO
 
 
+async def _close_proforma(session: AsyncSession, document: Document) -> None:
+    """A tax invoice issued from a proforma replaces it: the proforma is closed, and what was
+    already paid on the proforma counts as paid on the invoice."""
+    if document.type not in (DocumentType.TAX_INVOICE, DocumentType.TAX_INVOICE_RECEIPT):
+        return
+    source_id = await session.scalar(
+        select(DocumentRelation.to_document_id).where(
+            DocumentRelation.from_document_id == document.id,
+            DocumentRelation.relation == RelationType.CONVERTED_FROM,
+        )
+    )
+    if source_id is None:
+        return
+    proforma = await _lock(session, source_id)
+    if (
+        proforma.type != DocumentType.PROFORMA_INVOICE
+        or proforma.status != DocumentStatus.ISSUED
+        or proforma.superseded_by_id is not None
+    ):
+        return
+    proforma.superseded_by_id = document.id
+    if document.type == DocumentType.TAX_INVOICE:
+        document.amount_paid = min(proforma.amount_paid, document.total)
+
+
 async def _lock(session: AsyncSession, document_id: uuid.UUID) -> Document:
     # populate_existing: re-read after the lock, so a concurrent receipt's update is not lost.
     invoice = await session.scalar(
@@ -810,6 +840,7 @@ async def issue(session: AsyncSession, ctx: BusinessContext, document_id: uuid.U
     await _recalculate(session, business, document)  # VAT rate for the final issue date
     await _validate_for_issue(session, business, document)
     await _apply_to_invoices(session, document)
+    await _close_proforma(session, document)
 
     document.number = await numbering.next_number(
         session, ctx.business_id, DocumentType(document.type)

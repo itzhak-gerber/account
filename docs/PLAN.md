@@ -5,7 +5,7 @@ invoices, receipts, and related documents. It has a Hebrew (RTL) responsive UI,
 a FastAPI backend, PostgreSQL, and a built-in MCP server so AI agents can work
 with the same data under the same security rules.
 
-> Status: **approved. M0, M1a, M2, M3 and M4 done; next: M7 (reports), then M1b (Azure)**. Decisions are recorded in [§14](#14-decisions-log).
+> Status: **approved. M0, M1a, M2, M3, M4 and M7 done; next: M1b (Azure dev environment)**. Decisions are recorded in [§14](#14-decisions-log).
 
 ---
 
@@ -413,7 +413,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links, documents emailed to customers (PDF attached, logo inline, retries, delivery history) |
 | **M5** | Notifications | In-app inbox, PWA + Web Push to phones, email notifications, preferences screen, MCP tools |
 | **M6** | Israeli compliance | OPENFRMT export; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
-| **M7** | Reports and dashboard | Revenue/VAT per period, open balances, CSV/Excel export, MCP `get_report` |
+| **M7** | Reports and dashboard | ✅ income and VAT per period (taxable / zero-rated / exempt), money received by payment method, open balances with aging, Excel export, dashboard figures and 12-month chart, MCP `get_report` |
 | **M8** | Production hardening | Azure staging + production, observability, backups/restore drill, load test, security review and pen test, privacy policy and terms |
 | **Later** | | Inventory module (§10), WhatsApp/SMS, recurring invoices, online card payment links, multi-currency, accountant portal, digitally signed PDFs, English UI, subscription billing |
 
@@ -437,7 +437,24 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
   `open_only` lists invoices with a balance (basis for the unpaid-invoices report, M7).
 - Business logo (PNG/JPG, re-encoded and resized) prints on documents; issued documents keep the
   logo they were issued with.
+- A tax invoice (or invoice-receipt) issued from a proforma replaces it: the proforma is marked
+  `superseded` (no longer owed) and what was paid on it counts as paid on the tax invoice.
 - Not yet: allocation numbers (feature flag, off), customer tax-ID threshold rules for allocation.
+
+### M7 implementation notes (for CPA review)
+
+- Reports read the totals stored on issued documents; drafts are never included. Amounts are ILS.
+- **Income and VAT**: tax invoices, invoice-receipts and credit notes (negative), by issue date.
+  Before-VAT amounts are split as the periodic VAT return asks: taxable (standard-rated lines),
+  zero-rated, exempt; plus VAT on sales. Input VAT (expenses) is out of scope.
+- **Money received**: receipts and invoice-receipts by the receipt's issue date (not the cheque
+  date), totalled per payment method.
+- **Open balances**: issued tax invoices and proformas with a balance, today. Days overdue count
+  from the due date, or from the issue date when there is none. Buckets: not yet due, 1–30,
+  31–60, 61–90, over 90.
+- Period presets include the last completed two-month VAT period (Jan–Feb, Mar–Apr, …).
+- Excel files are right-to-left, with real numbers and dates; text is never stored as a formula.
+- Who sees reports: owner, admin, accountant, member. Not viewers.
 
 ---
 

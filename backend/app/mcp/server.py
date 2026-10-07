@@ -8,6 +8,7 @@ rules and row-level security apply identically. Membership management stays web-
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import date
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken
@@ -34,7 +35,8 @@ from app.schemas.documents import (
     EmailRequest,
 )
 from app.schemas.identity import BusinessOut, MemberOut, UserOut
-from app.services import businesses, catalog, delivery, documents
+from app.schemas.reports import IncomeReport, OpenBalancesReport, ReceiptsReport, ReportName
+from app.services import businesses, catalog, delivery, documents, reports
 from app.services.system import SystemStatus, get_system_status
 
 
@@ -313,5 +315,38 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
             return DeliveryOut.model_validate(
                 await delivery.send(session, ctx, document_id, request)
             )
+
+    # --- reports -------------------------------------------------------------------------
+
+    @mcp.tool()
+    async def get_report(
+        business_id: uuid.UUID,
+        report: ReportName,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        include_documents: bool = False,
+    ) -> IncomeReport | ReceiptsReport | OpenBalancesReport:
+        """Business reports. Amounts in ILS; issued documents only.
+
+        income: tax invoices, invoice-receipts and credit notes (negative) by issue date, per
+          month, split as the VAT return asks (taxable, zero-rated, exempt, VAT).
+        receipts: money received (receipts and invoice-receipts) per month and payment method.
+        open_balances: what customers owe now, per customer, with aging (days past due).
+        The period defaults to this month; open_balances ignores it. Set include_documents to
+        list the individual documents too.
+        """
+        async with _business_session(business_id) as (session, ctx):
+            now = documents.today()
+            start, end = date_from or reports.month_start(now), date_to or now
+            result: IncomeReport | ReceiptsReport | OpenBalancesReport
+            if report == "income":
+                result = await reports.income(session, ctx, start, end)
+            elif report == "receipts":
+                result = await reports.receipts(session, ctx, start, end)
+            else:
+                result = await reports.open_balances(session, ctx)
+            if not include_documents:
+                result.documents = []
+            return result
 
     return mcp

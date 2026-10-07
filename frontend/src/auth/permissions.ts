@@ -12,7 +12,8 @@ export function can(
     | "viewMembers"
     | "viewAudit"
     | "manageCatalog"
-    | "editDocuments",
+    | "editDocuments"
+    | "viewReports",
 ): boolean {
   if (!role) return false;
   switch (action) {
@@ -26,6 +27,8 @@ export function can(
     case "manageCatalog":
     case "editDocuments":
       return role === "owner" || role === "admin" || role === "member";
+    case "viewReports":
+      return role !== "viewer";
     case "viewAudit":
       return role === "owner" || role === "admin" || role === "accountant";
   }
