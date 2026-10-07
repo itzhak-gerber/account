@@ -221,7 +221,7 @@ async def test_excel_export_is_rtl_with_numbers_and_no_formulas(idp: FakeIdP) ->
         row = {h: c for h, c in zip(header, details[5], strict=True)}
         assert row["סוג מסמך"].value == "חשבונית מס"
         assert row["לקוח"].data_type == "s"  # stored as text, not a formula
-        assert row["לקוח"].value.startswith("=HYPERLINK")
+        assert str(row["לקוח"].value).startswith("=HYPERLINK")
         assert row["סה״כ כולל מע״מ"].value == 1286.2
         assert row["סה״כ כולל מע״מ"].number_format == "#,##0.00;-#,##0.00"
         summary = book["סיכום"]
