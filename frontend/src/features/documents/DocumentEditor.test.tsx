@@ -249,4 +249,46 @@ describe("DocumentEditor", () => {
       message: "שלום",
     });
   });
+
+  it("warns before the first PDF download uses up the original", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/api/v1/me") return json(ME);
+        if (url.endsWith("/document-types")) return json(TYPES);
+        if (url.endsWith("/email-defaults"))
+          return json({ to: [], subject: "חשבונית מס מס׳ 1", message: "" });
+        if (url.endsWith("/documents/d1")) return json(issuedDoc("d1"));
+        return json([]);
+      }),
+    );
+    const open = vi.fn();
+    vi.stubGlobal("open", open);
+    render(
+      <MemoryRouter initialEntries={["/documents/d1"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("link", { name: "הורדת PDF" }));
+    let dialog = await screen.findByRole("dialog", { name: "הורדת המקור של המסמך" });
+    await user.click(within(dialog).getByRole("button", { name: "ביטול" }));
+    expect(open).not.toHaveBeenCalled();
+
+    await user.click(await screen.findByRole("link", { name: "הורדת PDF" }));
+    dialog = await screen.findByRole("dialog", { name: "הורדת המקור של המסמך" });
+    await user.click(within(dialog).getByRole("button", { name: "הורדת המקור" }));
+    expect(open).toHaveBeenCalledWith(
+      expect.stringContaining("/documents/d1/pdf"),
+      "_blank",
+      "noopener",
+    );
+
+    await user.click(await screen.findByRole("link", { name: "הורדת PDF" }));
+    dialog = await screen.findByRole("dialog", { name: "הורדת המקור של המסמך" });
+    await user.click(within(dialog).getByRole("button", { name: "שליחת המקור ללקוח במייל" }));
+    expect(await screen.findByRole("button", { name: "שליחה" })).toBeInTheDocument();
+  });
 });

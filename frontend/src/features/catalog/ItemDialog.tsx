@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import type { Item, ItemInput } from "../../api/types";
+import { cleanAmount, finishAmount, isAmount } from "../../lib/amount";
 import { errorMessage } from "../../lib/errors";
 
 const EMPTY: ItemInput = {
@@ -52,12 +53,12 @@ export function ItemDialog({ businessId, item, open, onClose }: Props) {
     },
   });
 
-  const priceOk = /^\d+(\.\d{1,2})?$/.test(value.unit_price);
+  const priceOk = isAmount(value.unit_price);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setTouched(true);
     if (!value.name.trim() || !priceOk) return;
-    save.mutate(value);
+    save.mutate({ ...value, unit_price: finishAmount(value.unit_price) });
   };
   const field = (name: keyof ItemInput, props: Record<string, unknown> = {}) => (
     <TextField
@@ -91,6 +92,9 @@ export function ItemDialog({ businessId, item, open, onClose }: Props) {
               {field("unit_price", {
                 required: true,
                 error: touched && !priceOk,
+                helperText: touched && !priceOk ? t("amount.invalid") : t("amount.example"),
+                onChange: (e: { target: { value: string } }) =>
+                  setValue((v) => ({ ...v, unit_price: cleanAmount(e.target.value) })),
                 slotProps: { htmlInput: { dir: "ltr", inputMode: "decimal" } },
               })}
             </Grid>

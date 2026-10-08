@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import type { DocumentSummary } from "../../api/types";
+import { cleanAmount } from "../../lib/amount";
 import { formatDate, formatMoney } from "../../lib/money";
 import type { AllocationRow } from "./helpers";
 
@@ -74,7 +75,7 @@ export function AllocationsEditor({
                 onChange={(e) =>
                   onChange(
                     rows.map((r, i) =>
-                      i === index ? { ...r, amount: e.target.value.replace(/[^\d.]/g, "") } : r,
+                      i === index ? { ...r, amount: cleanAmount(e.target.value) } : r,
                     ),
                   )
                 }

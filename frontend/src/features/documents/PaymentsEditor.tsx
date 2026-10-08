@@ -10,6 +10,7 @@ import TextField from "@mui/material/TextField";
 import { useTranslation } from "react-i18next";
 
 import type { PaymentDetails, PaymentInput, PaymentMethod } from "../../api/types";
+import { cleanAmount } from "../../lib/amount";
 
 const METHODS: PaymentMethod[] = [
   "bank_transfer",
@@ -80,7 +81,7 @@ export function PaymentsEditor({ payments, defaultDate, remaining, onChange }: P
                 fullWidth
                 label={t("editor.amount")}
                 value={p.amount}
-                onChange={(e) => update(index, { amount: e.target.value.replace(/[^\d.]/g, "") })}
+                onChange={(e) => update(index, { amount: cleanAmount(e.target.value) })}
                 slotProps={{ htmlInput: { dir: "ltr", inputMode: "decimal" } }}
               />
             </Grid>

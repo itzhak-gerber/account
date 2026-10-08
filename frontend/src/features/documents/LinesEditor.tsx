@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import type { Item, LineInput, VatType } from "../../api/types";
+import { cleanAmount } from "../../lib/amount";
 import { formatMoney } from "../../lib/money";
 import { EMPTY_LINE } from "./helpers";
 
@@ -101,7 +102,7 @@ export function LinesEditor({
   const numeric = (index: number, field: "quantity" | "unit_price" | "discount_percent") => ({
     value: lines[index][field],
     onChange: (e: { target: { value: string } }) =>
-      update(index, { [field]: e.target.value.replace(/[^\d.]/g, "") }),
+      update(index, { [field]: cleanAmount(e.target.value, field === "quantity" ? 3 : 2) }),
     size: "small" as const,
     fullWidth: true,
     slotProps: { htmlInput: { dir: "ltr", inputMode: "decimal" as const } },

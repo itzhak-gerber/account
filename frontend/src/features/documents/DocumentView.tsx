@@ -5,6 +5,11 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import Grid from "@mui/material/Grid";
 import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
@@ -43,6 +48,7 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
   const base = `/businesses/${businessId}/documents/${doc.id}`;
   const canEdit = can(current?.role, "editDocuments");
   const [emailing, setEmailing] = useState(false);
+  const [confirmOriginal, setConfirmOriginal] = useState(false);
   const vatRegistered = ["licensed_dealer", "company"].includes(current!.business.business_type);
 
   const derive = useMutation({
@@ -55,6 +61,20 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
       void navigate(`/documents/${draft.id}`);
     },
   });
+
+  const refreshSoon = () =>
+    setTimeout(
+      () =>
+        void queryClient.invalidateQueries({
+          queryKey: ["business", businessId, "document", doc.id],
+        }),
+      1500,
+    );
+  const downloadOriginal = () => {
+    setConfirmOriginal(false);
+    window.open(pdfUrl(businessId, doc.id), "_blank", "noopener");
+    refreshSoon();
+  };
 
   const conversions = (CONVERSIONS[doc.type] ?? []).filter(
     (target) => vatRegistered || !["tax_invoice", "tax_invoice_receipt"].includes(target),
@@ -79,15 +99,15 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
           href={pdfUrl(businessId, doc.id)}
           target="_blank"
           rel="noopener"
-          onClick={() =>
-            setTimeout(
-              () =>
-                void queryClient.invalidateQueries({
-                  queryKey: ["business", businessId, "document", doc.id],
-                }),
-              1500,
-            )
-          }
+          onClick={(e) => {
+            // The first download is the legal original; say so before it is used up.
+            if (!doc.original_delivered_at) {
+              e.preventDefault();
+              setConfirmOriginal(true);
+            } else {
+              refreshSoon();
+            }
+          }}
         >
           {t("view.downloadPdf")}
         </Button>
@@ -313,6 +333,31 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={confirmOriginal} onClose={() => setConfirmOriginal(false)} maxWidth="sm">
+        <DialogTitle>{t("view.originalDialog.title")}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{t("view.originalDialog.body")}</DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
+          <Button onClick={() => setConfirmOriginal(false)}>{t("common.cancel")}</Button>
+          {canEdit && (
+            <Button
+              variant="outlined"
+              startIcon={<MailOutlined />}
+              onClick={() => {
+                setConfirmOriginal(false);
+                setEmailing(true);
+              }}
+            >
+              {t("view.originalDialog.email")}
+            </Button>
+          )}
+          <Button variant="contained" onClick={downloadOriginal}>
+            {t("view.originalDialog.download")}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {emailing && (
         <SendEmailDialog
