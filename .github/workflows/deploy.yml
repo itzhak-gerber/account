@@ -1,9 +1,12 @@
 name: Deploy (Azure dev)
 
-# Called by CI after all tests pass (and only once the AZURE_ENV variable exists).
+# Called by CI after all tests pass, when the AUTO_DEPLOY variable is "true"; or run by hand
+# (Actions -> Deploy (Azure dev) -> Run workflow) for the chosen branch's latest commit, which
+# should be one whose CI run is green. A deploy also starts a paused environment.
 # Signs in to Azure with OpenID Connect: no password or key is stored in GitHub.
 on:
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   id-token: write

@@ -168,5 +168,6 @@ cat <<EOF
   Name:  AZURE_ENV
   Value: ${AZURE_ENV}
 
-After that, every push deploys to Azure automatically.
+After that, deploy from GitHub: Actions -> Deploy (Azure dev) -> Run workflow
+(or add a variable AUTO_DEPLOY=true to deploy after every push).
 EOF

@@ -39,8 +39,10 @@ Sweden Central and are used from there:
 4. In GitHub: repository **Settings** → **Secrets and variables** → **Actions** →
    **Variables** → **New repository variable**: name `AZURE_ENV`, value as printed.
 
-From then on every push to `main` or the working branch deploys automatically after the
-tests pass (CI job **deploy**). The first deploy takes about 20–30 minutes (the database
+Deploying is manual by default: **Actions** → **Deploy (Azure dev)** → **Run workflow**
+(choose the branch; its latest commit should have a green CI run). To deploy automatically
+after every push to `main` or the working branch (CI job **deploy**), add a repository
+variable `AUTO_DEPLOY` with the value `true`; delete it or set `false` to stop. The first deploy takes about 20–30 minutes (the database
 server is the slowest part); later ones about 10.
 
 ## How a deploy works (`.github/workflows/deploy.yml`)

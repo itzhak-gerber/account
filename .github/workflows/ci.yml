@@ -129,9 +129,10 @@ jobs:
 
   deploy:
     needs: [docker, infra]
-    # Only from the deploying branches, and only once Azure is set up (bootstrap.sh).
+    # Only from the deploying branches, only once Azure is set up (bootstrap.sh), and only while
+    # the AUTO_DEPLOY variable is "true". Otherwise deploy by hand: Actions -> Deploy (Azure dev).
     if: >-
-      github.event_name == 'push' && vars.AZURE_ENV != '' &&
+      github.event_name == 'push' && vars.AZURE_ENV != '' && vars.AUTO_DEPLOY == 'true' &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/stoic-goldberg-6t002s')
     permissions:
       id-token: write
