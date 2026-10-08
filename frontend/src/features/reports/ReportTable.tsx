@@ -43,7 +43,8 @@ export function ReportTable<T>({
     </TableCell>
   );
   return (
-    <TableContainer>
+    // Wide tables scroll sideways on phones; focusable so the keyboard can scroll them too.
+    <TableContainer tabIndex={0} role="region" aria-label={label}>
       <Table size="small" aria-label={label}>
         <TableHead>
           <TableRow>

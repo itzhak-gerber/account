@@ -20,14 +20,15 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Outlet, useLocation, useNavigate } from "react-router";
+import { Link as RouterLink, Outlet, useLocation, useNavigate } from "react-router";
 
 import { useSession } from "../auth/context";
 import { NotificationBell } from "../features/notifications/NotificationBell";
 import { MfaRequiredPage } from "../pages/MfaRequiredPage";
 import { NAV_ITEMS } from "./navigation";
+import { usePageAnnouncer } from "./usePageAnnouncer";
 
 const DRAWER_WIDTH = 240;
 
@@ -40,6 +41,8 @@ export function AppShell() {
   const navigate = useNavigate();
   const { me, current, selectBusiness, logout } = useSession();
   const [userMenu, setUserMenu] = useState<HTMLElement | null>(null);
+  const main = useRef<HTMLElement>(null);
+  usePageAnnouncer(t("app.name"), main);
   // Owners and admins must sign in with two-factor authentication before using the business.
   const mfaWall =
     current !== null && (current.role === "owner" || current.role === "admin") && !me.mfa;
@@ -54,8 +57,11 @@ export function AppShell() {
       {NAV_ITEMS.map((item) => (
         <ListItemButton
           key={item.path}
+          component={RouterLink}
+          to={item.path}
           selected={location.pathname === item.path}
-          onClick={() => go(item.path)}
+          aria-current={location.pathname === item.path ? "page" : undefined}
+          onClick={() => setMobileMenuOpen(false)}
           sx={{ mx: 1, borderRadius: 2 }}
         >
           <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
@@ -72,6 +78,29 @@ export function AppShell() {
 
   return (
     <Box sx={{ display: "flex", minHeight: "100dvh" }}>
+      <Box
+        component="a"
+        href="#main"
+        onClick={(e: React.MouseEvent) => {
+          e.preventDefault();
+          main.current?.focus();
+        }}
+        sx={{
+          position: "fixed",
+          top: 8,
+          insetInlineStart: 8,
+          zIndex: (th) => th.zIndex.tooltip + 1,
+          px: 2,
+          py: 1,
+          borderRadius: 1,
+          bgcolor: "primary.main",
+          color: "primary.contrastText",
+          transform: "translateY(-200%)",
+          "&:focus": { transform: "none" },
+        }}
+      >
+        {t("app.skipToContent")}
+      </Box>
       <AppBar
         position="fixed"
         elevation={0}
@@ -178,7 +207,16 @@ export function AppShell() {
 
       <Box
         component="main"
-        sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}
+        id="main"
+        ref={main}
+        tabIndex={-1}
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          p: { xs: 2, md: 4 },
+          pb: { xs: 10, md: 4 },
+          outline: "none",
+        }}
       >
         <Toolbar />
         {mfaWall && location.pathname !== "/profile" ? <MfaRequiredPage /> : <Outlet />}

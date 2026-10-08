@@ -5,6 +5,7 @@ import Card from "@mui/material/Card";
 import Chip from "@mui/material/Chip";
 import InputAdornment from "@mui/material/InputAdornment";
 import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
@@ -71,18 +72,21 @@ export function CustomersPage() {
         )}
         <List disablePadding>
           {customers.data?.map((c) => (
-            <ListItemButton
-              key={c.id}
-              divider
-              onClick={() => canEdit && setEditing(c)}
-              sx={{ gap: 1, flexWrap: "wrap" }}
-            >
-              <ListItemText
-                primary={c.name}
-                secondary={[c.tax_id, c.phone, c.email, c.address_city].filter(Boolean).join(" · ")}
-              />
-              {c.is_archived && <Chip size="small" label={t("customers.archived")} />}
-            </ListItemButton>
+            <ListItem key={c.id} disablePadding>
+              <ListItemButton
+                divider
+                onClick={() => canEdit && setEditing(c)}
+                sx={{ gap: 1, flexWrap: "wrap" }}
+              >
+                <ListItemText
+                  primary={c.name}
+                  secondary={[c.tax_id, c.phone, c.email, c.address_city]
+                    .filter(Boolean)
+                    .join(" · ")}
+                />
+                {c.is_archived && <Chip size="small" label={t("customers.archived")} />}
+              </ListItemButton>
+            </ListItem>
           ))}
         </List>
       </Card>

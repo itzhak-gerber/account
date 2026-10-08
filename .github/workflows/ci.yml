@@ -94,6 +94,10 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Accessibility in a real browser (contrast; desktop and phone; every screen)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run a11y:browser
 
   infra:
     runs-on: ubuntu-latest

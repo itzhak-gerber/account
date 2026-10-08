@@ -7,6 +7,7 @@ import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
 import SummarizeOutlined from "@mui/icons-material/SummarizeOutlined";
 import Box from "@mui/material/Box";
 import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -48,46 +49,47 @@ export function NotificationList({
       {items.map((n) => {
         const unread = n.read_at === null;
         return (
-          <ListItemButton
-            key={n.id}
-            divider
-            dense={dense}
-            onClick={() => onOpen(n)}
-            sx={{ alignItems: "flex-start", bgcolor: unread ? "action.hover" : undefined }}
-          >
-            <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>{ICONS[n.event]}</ListItemIcon>
-            <ListItemText
-              primary={
-                <Typography component="span" sx={{ fontWeight: unread ? 700 : 400 }}>
-                  {n.title}
-                </Typography>
-              }
-              secondary={
-                <>
-                  <Box component="span" sx={{ display: "block" }}>
-                    {n.body}
-                  </Box>
-                  <Box component="span" sx={{ display: "block", mt: 0.25 }}>
-                    {timeAgo(n.created_at)}
-                  </Box>
-                </>
-              }
-            />
-            {unread && (
-              <Box
-                role="img"
-                aria-label={t("notifications.unread")}
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  bgcolor: "primary.main",
-                  mt: 1.25,
-                  ms: 1,
-                }}
+          <ListItem key={n.id} disablePadding>
+            <ListItemButton
+              divider
+              dense={dense}
+              onClick={() => onOpen(n)}
+              sx={{ alignItems: "flex-start", bgcolor: unread ? "action.hover" : undefined }}
+            >
+              <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>{ICONS[n.event]}</ListItemIcon>
+              <ListItemText
+                primary={
+                  <Typography component="span" sx={{ fontWeight: unread ? 700 : 400 }}>
+                    {n.title}
+                  </Typography>
+                }
+                secondary={
+                  <>
+                    <Box component="span" sx={{ display: "block" }}>
+                      {n.body}
+                    </Box>
+                    <Box component="span" sx={{ display: "block", mt: 0.25 }}>
+                      {timeAgo(n.created_at)}
+                    </Box>
+                  </>
+                }
               />
-            )}
-          </ListItemButton>
+              {unread && (
+                <Box
+                  role="img"
+                  aria-label={t("notifications.unread")}
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    bgcolor: "primary.main",
+                    mt: 1.25,
+                    ms: 1,
+                  }}
+                />
+              )}
+            </ListItemButton>
+          </ListItem>
         );
       })}
     </List>

@@ -210,8 +210,14 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
       </Grid>
 
       {doc.lines.length > 0 && (
-        <TableContainer component={Card} variant="outlined">
-          <Table size="small">
+        <TableContainer
+          component={Card}
+          variant="outlined"
+          tabIndex={0}
+          role="region"
+          aria-label={t("view.lines")}
+        >
+          <Table size="small" aria-label={t("view.lines")}>
             <TableHead>
               <TableRow>
                 <TableCell>{t("editor.description")}</TableCell>

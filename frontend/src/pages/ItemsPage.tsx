@@ -4,6 +4,7 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import InputAdornment from "@mui/material/InputAdornment";
 import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
@@ -69,22 +70,24 @@ export function ItemsPage() {
         )}
         <List disablePadding>
           {items.data?.map((item) => (
-            <ListItemButton key={item.id} divider onClick={() => canEdit && setEditing(item)}>
-              <ListItemText
-                primary={item.name}
-                secondary={[
-                  t(`items.types.${item.item_type}`),
-                  item.sku,
-                  t(`vatTypes.${item.vat_type}`),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              />
-              <Typography sx={{ fontWeight: 500 }}>
-                {formatMoney(item.unit_price)}
-                {item.unit_of_measure && ` / ${item.unit_of_measure}`}
-              </Typography>
-            </ListItemButton>
+            <ListItem key={item.id} disablePadding>
+              <ListItemButton divider onClick={() => canEdit && setEditing(item)}>
+                <ListItemText
+                  primary={item.name}
+                  secondary={[
+                    t(`items.types.${item.item_type}`),
+                    item.sku,
+                    t(`vatTypes.${item.vat_type}`),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                />
+                <Typography sx={{ fontWeight: 500 }}>
+                  {formatMoney(item.unit_price)}
+                  {item.unit_of_measure && ` / ${item.unit_of_measure}`}
+                </Typography>
+              </ListItemButton>
+            </ListItem>
           ))}
         </List>
       </Card>

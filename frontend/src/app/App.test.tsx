@@ -192,8 +192,8 @@ describe("App", () => {
 
     expect(await screen.findByText("הכנסות לפני מע״מ · החודש")).toBeInTheDocument();
     expect(screen.getByText(/מתוכם באיחור: .*1,000\.00/)).toBeInTheDocument();
-    const table = screen.getByRole("table", { name: "הכנסות לפני מע״מ – 12 החודשים האחרונים" });
-    expect(within(table).getAllByRole("row")).toHaveLength(12);
+    const chart = screen.getByRole("group", { name: "הכנסות לפני מע״מ – 12 החודשים האחרונים" });
+    expect(within(chart).getAllByRole("img")).toHaveLength(12);
   });
 
   it("shows the income report with VAT split and an Excel link for the chosen period", async () => {

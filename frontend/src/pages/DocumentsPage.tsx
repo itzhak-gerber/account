@@ -66,7 +66,8 @@ export function DocumentsPage() {
           value={type}
           onChange={(e) => setType(e.target.value as DocumentType | "")}
           sx={{ flex: 1, minWidth: 180 }}
-          slotProps={{ select: { displayEmpty: true } }}
+          label={t("documents.typeFilter")}
+          slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
         >
           <MenuItem value="">{t("documents.allTypes")}</MenuItem>
           {types.data?.map((info) => (

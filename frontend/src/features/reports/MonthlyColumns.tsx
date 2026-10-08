@@ -6,20 +6,6 @@ import { formatMoney } from "../../lib/money";
 import { monthLabel } from "./periods";
 
 const PLOT_HEIGHT = 160;
-// For screen readers only; the wrapper clips it so it never widens the page.
-const visuallyHidden = {
-  position: "absolute",
-  insetInlineStart: 0,
-  top: 0,
-  width: "1px",
-  height: "1px",
-  margin: "-1px",
-  padding: 0,
-  border: 0,
-  overflow: "hidden",
-  clipPath: "inset(50%)",
-  whiteSpace: "nowrap",
-} as const;
 const compact = new Intl.NumberFormat("he-IL", { notation: "compact", maximumFractionDigits: 1 });
 
 /** A clean axis maximum: 1, 2, 2.5 or 5 times a power of ten. */
@@ -32,7 +18,8 @@ function niceMax(value: number): number {
 
 /**
  * One series of monthly amounts as columns, oldest on the left (like the Excel export).
- * Hover or focus a month for its exact amount; the current month carries a label.
+ * Hover or focus a month for its exact amount; the current month carries a label. Screen
+ * readers get a named group with one "month: amount" image per column.
  */
 export function MonthlyColumns({
   data,
@@ -48,8 +35,9 @@ export function MonthlyColumns({
 
   return (
     <Box sx={{ position: "relative" }}>
-      <Box dir="ltr" sx={{ display: "flex", gap: 1 }} aria-hidden>
+      <Box dir="ltr" sx={{ display: "flex", gap: 1 }} role="group" aria-label={title}>
         <Box
+          aria-hidden
           sx={{
             height: PLOT_HEIGHT,
             display: "flex",
@@ -98,10 +86,11 @@ export function MonthlyColumns({
                 key={d.month}
                 title={`${monthLabel(d.month)}: ${formatMoney(d.amount)}`}
                 placement="top"
-                describeChild
               >
                 <Box
                   tabIndex={0}
+                  role="img"
+                  aria-label={`${monthLabel(d.month)}: ${formatMoney(d.amount)}`}
                   sx={{
                     position: "relative",
                     flex: 1,
@@ -118,6 +107,7 @@ export function MonthlyColumns({
                 >
                   {i === last && values[i] > 0 && (
                     <Typography
+                      aria-hidden
                       variant="caption"
                       sx={{
                         position: "absolute",
@@ -144,7 +134,7 @@ export function MonthlyColumns({
               </Tooltip>
             ))}
           </Box>
-          <Box sx={{ display: "flex", mt: 0.5 }}>
+          <Box aria-hidden sx={{ display: "flex", mt: 0.5 }}>
             {data.map((d, i) => (
               <Typography
                 key={d.month}
@@ -164,19 +154,6 @@ export function MonthlyColumns({
             ))}
           </Box>
         </Box>
-      </Box>
-      <Box sx={visuallyHidden}>
-        <table>
-          <caption>{title}</caption>
-          <tbody>
-            {data.map((d) => (
-              <tr key={d.month}>
-                <th scope="row">{monthLabel(d.month)}</th>
-                <td>{formatMoney(d.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </Box>
     </Box>
   );
