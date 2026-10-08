@@ -166,5 +166,8 @@ async def render_pdf(
     logo: bytes | None = None,
 ) -> bytes:
     html = render_html(doc, business, variant, references, logo)
-    pdf: bytes = await anyio.to_thread.run_sync(lambda: HTML(string=html).write_pdf())
+    # PDF/UA: tagged (headings, tables, language) so screen readers can read the document.
+    pdf: bytes = await anyio.to_thread.run_sync(
+        lambda: HTML(string=html).write_pdf(pdf_variant="pdf/ua-1")
+    )
     return pdf

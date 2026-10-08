@@ -2,9 +2,11 @@ import LockOutlined from "@mui/icons-material/LockOutlined";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
+import { Link as RouterLink } from "react-router";
 
 import { startLogin } from "../api/client";
 
@@ -52,6 +54,9 @@ export function LandingPage() {
           <LockOutlined fontSize="small" />
           <Typography variant="body2">{t("landing.secure")}</Typography>
         </Stack>
+        <Link component={RouterLink} to="/accessibility" variant="body2">
+          {t("nav.accessibility")}
+        </Link>
       </Stack>
     </Box>
   );

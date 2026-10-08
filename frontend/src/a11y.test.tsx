@@ -55,6 +55,7 @@ describe("accessibility (axe)", () => {
     ["notifications", "/notifications"],
     ["settings", "/settings"],
     ["profile", "/profile"],
+    ["accessibility statement", "/accessibility"],
   ])("%s", async (_name, path) => check(path), 20000);
 
   it("onboarding", () => check("/", { ...ME, memberships: [] }), 20000);

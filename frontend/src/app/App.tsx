@@ -6,6 +6,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router";
 
 import { useMeQuery } from "../auth/useMe";
 import { SessionProvider } from "../auth/session";
+import { AccessibilityPage } from "../pages/AccessibilityPage";
 import { CustomersPage } from "../pages/CustomersPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { DocumentPage } from "../pages/DocumentPage";
@@ -85,7 +86,11 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <RtlThemeProvider>
-        <AuthenticatedRoutes />
+        <Routes>
+          {/* Public: the accessibility statement must be reachable without signing in. */}
+          <Route path="/accessibility" element={<AccessibilityPage />} />
+          <Route path="*" element={<AuthenticatedRoutes />} />
+        </Routes>
       </RtlThemeProvider>
     </QueryClientProvider>
   );

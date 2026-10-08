@@ -24,6 +24,7 @@ const SCREENS = [
   ["notifications", "/notifications"],
   ["settings", "/settings"],
   ["profile", "/profile"],
+  ["accessibility statement", "/accessibility"],
   ["onboarding", "/", { ...ME, memberships: [] }],
   ["two-factor required", "/", { ...ME, memberships: [], mfa: false }],
 ];

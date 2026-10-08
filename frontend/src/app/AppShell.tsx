@@ -7,7 +7,9 @@ import BottomNavigationAction from "@mui/material/BottomNavigationAction";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
+import Link from "@mui/material/Link";
 import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -53,22 +55,35 @@ export function AppShell() {
   };
 
   const navList = (
-    <List component="nav" aria-label={t("app.name")}>
+    <List>
       {NAV_ITEMS.map((item) => (
-        <ListItemButton
-          key={item.path}
-          component={RouterLink}
-          to={item.path}
-          selected={location.pathname === item.path}
-          aria-current={location.pathname === item.path ? "page" : undefined}
-          onClick={() => setMobileMenuOpen(false)}
-          sx={{ mx: 1, borderRadius: 2 }}
-        >
-          <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-          <ListItemText primary={t(item.labelKey)} />
-        </ListItemButton>
+        <ListItem key={item.path} disablePadding>
+          <ListItemButton
+            component={RouterLink}
+            to={item.path}
+            selected={location.pathname === item.path}
+            aria-current={location.pathname === item.path ? "page" : undefined}
+            onClick={() => setMobileMenuOpen(false)}
+            sx={{ mx: 1, borderRadius: 2 }}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+            <ListItemText primary={t(item.labelKey)} />
+          </ListItemButton>
+        </ListItem>
       ))}
     </List>
+  );
+
+  const accessibilityLink = (
+    <Link
+      component={RouterLink}
+      to="/accessibility"
+      variant="body2"
+      color="text.secondary"
+      sx={{ mt: "auto", p: 2 }}
+    >
+      {t("nav.accessibility")}
+    </Link>
   );
 
   const primaryItems = NAV_ITEMS.filter((item) => item.primary);
@@ -190,7 +205,14 @@ export function AppShell() {
           }}
         >
           <Toolbar />
-          {navList}
+          <Box
+            component="nav"
+            aria-label={t("app.name")}
+            sx={{ display: "flex", flexDirection: "column", flex: 1 }}
+          >
+            {navList}
+            {accessibilityLink}
+          </Box>
         </Drawer>
       ) : (
         <Drawer
@@ -201,7 +223,14 @@ export function AppShell() {
           sx={{ "& .MuiDrawer-paper": { width: DRAWER_WIDTH } }}
         >
           <Toolbar />
-          {navList}
+          <Box
+            component="nav"
+            aria-label={t("app.name")}
+            sx={{ display: "flex", flexDirection: "column", flex: 1 }}
+          >
+            {navList}
+            {accessibilityLink}
+          </Box>
         </Drawer>
       )}
 
