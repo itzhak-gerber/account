@@ -23,6 +23,7 @@ from app.models.documents import (
 )
 from app.models.identity import Business, BusinessMember, BusinessType, Invitation, Role, User
 from app.models.inventory import MovementKind, StockLevel, StockMovement
+from app.models.ita import AllocationRequest, AllocationStatus, ItaConnection
 from app.models.notifications import (
     Notification,
     NotificationEvent,
@@ -41,6 +42,8 @@ from app.models.purchasing import (
 )
 
 __all__ = [
+    "AllocationRequest",
+    "AllocationStatus",
     "AuditLog",
     "Base",
     "Business",
@@ -61,6 +64,7 @@ __all__ = [
     "GoodsReceipt",
     "GoodsReceiptLine",
     "Invitation",
+    "ItaConnection",
     "Item",
     "ItemComponent",
     "ItemType",

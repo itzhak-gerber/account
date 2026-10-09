@@ -60,6 +60,7 @@ describe("accessibility (axe)", () => {
     ["notifications", "/notifications"],
     ["settings", "/settings"],
     ["data export", "/settings?tab=export"],
+    ["tax authority", "/settings?tab=ita"],
     ["profile", "/profile"],
     ["accessibility statement", "/accessibility"],
   ])("%s", async (_name, path) => check(path), 20000);

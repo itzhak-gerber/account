@@ -83,6 +83,19 @@ deleted first (`az containerapp env delete -g rg-invoice-dev -n <old environment
 To scale an existing server down later (e.g. B2s to B1ms when capacity allows), use Cloud Shell:
 `az postgres flexible-server update -g rg-invoice-dev -n <server> --sku-name Standard_B1ms`.
 
+## Tax authority allocation numbers (off until the software is registered)
+
+1. Register the software at the tax authority's developer portal (openapi.taxes.gov.il) and
+   create an application with the redirect URL `https://invoice.<env>.../api/v1/ita/callback`
+   (Settings → רשות המסים shows the exact one). Start in the sandbox.
+2. Put the **client secret** only in Key Vault, from Cloud Shell (it is never typed anywhere
+   else): `az keyvault secret set --vault-name <vault> -n ita-client-secret --value '<secret>'`.
+   The deploy creates `ita-token-key` (encrypts the businesses' tokens) by itself.
+3. Add identifiers to the `AZURE_ENV` variable: `"itaClientId": "<client id>",
+   "itaEnabled": "true", "itaEnvironment": "sandbox"` (later `"production"`), and run Deploy.
+4. In the app, the owner opens Settings → רשות המסים → "התחברות לרשות המסים", signs in at the
+   tax authority and approves the software.
+
 ## Useful commands (Cloud Shell)
 
 ```bash

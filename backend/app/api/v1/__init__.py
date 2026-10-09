@@ -7,6 +7,7 @@ from app.api.v1 import (
     exports,
     files,
     inventory,
+    ita,
     me,
     notifications,
     purchasing,
@@ -26,3 +27,4 @@ router.include_router(notifications.router)
 router.include_router(exports.router)
 router.include_router(inventory.router)
 router.include_router(purchasing.router)
+router.include_router(ita.router)

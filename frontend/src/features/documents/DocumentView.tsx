@@ -64,6 +64,12 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
     },
   });
 
+  const askAgain = useMutation({
+    mutationFn: () => api.post<InvoiceDocument>(`${base}/allocation`),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["business", businessId, "document", doc.id] }),
+  });
+
   const refreshSoon = () =>
     setTimeout(
       () =>
@@ -94,6 +100,30 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
         {doc.delivery_status && <DeliveryChip status={doc.delivery_status} />}
       </Stack>
       {derive.isError && <Alert severity="error">{errorMessage(t, derive.error)}</Alert>}
+      {doc.allocation_number && (
+        <Typography>
+          {t("allocation.number")}: <strong dir="ltr">{doc.allocation_number}</strong>
+        </Typography>
+      )}
+      {(doc.allocation_status === "pending" || doc.allocation_status === "rejected") && (
+        <Alert
+          severity={doc.allocation_status === "pending" ? "warning" : "error"}
+          action={
+            canEdit && (
+              <Button
+                color="inherit"
+                disabled={askAgain.isPending}
+                onClick={() => askAgain.mutate()}
+              >
+                {t("allocation.askAgain")}
+              </Button>
+            )
+          }
+        >
+          {t(`allocation.${doc.allocation_status}`)}
+          {askAgain.isError && ` ${errorMessage(t, askAgain.error)}`}
+        </Alert>
+      )}
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
         <Button

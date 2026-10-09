@@ -58,6 +58,15 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Jerusalem"
     # Israel Tax Authority allocation numbers: off until the software is registered.
     ita_allocation_enabled: bool = False
+    # The software's credentials at the tax authority's developer portal (openapi.taxes.gov.il).
+    ita_environment: str = "sandbox"  # sandbox | production
+    ita_base_url: str = "https://openapi.taxes.gov.il/shaam"
+    ita_client_id: str = ""
+    ita_client_secret: str = ""
+    ita_scope: str = "scope"
+    # Fernet key (urlsafe base64, 32 bytes) that encrypts the businesses' tax authority tokens.
+    ita_token_key: str = ""
+    ita_timeout_seconds: float = 15
 
     smtp_host: str = "localhost"
     smtp_port: int = 1025
@@ -116,6 +125,17 @@ class Settings(BaseSettings):
     @property
     def secure_cookies(self) -> bool:
         return self.public_url.startswith("https://")
+
+    @property
+    def ita_configured(self) -> bool:
+        """Allocation numbers are on and the software's credentials are in place."""
+        unset = ("", "unset")
+        return (
+            self.ita_allocation_enabled
+            and self.ita_client_id not in unset
+            and self.ita_client_secret not in unset
+            and self.ita_token_key not in unset
+        )
 
     @property
     def oidc_backchannel_url(self) -> str:

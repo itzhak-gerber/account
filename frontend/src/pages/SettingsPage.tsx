@@ -17,12 +17,13 @@ import { can } from "../auth/permissions";
 import { AuditTab } from "../features/settings/AuditTab";
 import { ExportTab } from "../features/settings/ExportTab";
 import { BusinessForm } from "../features/settings/BusinessForm";
+import { ItaTab } from "../features/settings/ItaTab";
 import { LogoCard } from "../features/settings/LogoCard";
 import { NumberingTab } from "../features/settings/NumberingTab";
 import { TeamTab } from "../features/settings/TeamTab";
 import { errorMessage } from "../lib/errors";
 
-type TabKey = "details" | "team" | "numbering" | "audit" | "export";
+type TabKey = "details" | "team" | "numbering" | "ita" | "audit" | "export";
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -45,6 +46,7 @@ export function SettingsPage() {
   const tabs: TabKey[] = ["details"];
   if (can(role, "viewMembers")) tabs.push("team");
   tabs.push("numbering");
+  if (can(role, "manageBusiness")) tabs.push("ita");
   if (can(role, "viewAudit")) tabs.push("audit");
   if (can(role, "exportData")) tabs.push("export");
 
@@ -99,6 +101,7 @@ export function SettingsPage() {
         </Card>
       )}
       {tab === "team" && <TeamTab businessId={business.id} role={role} />}
+      {tab === "ita" && <ItaTab businessId={business.id} canManage={can(role, "manageBusiness")} />}
       {tab === "numbering" && (
         <NumberingTab businessId={business.id} canEdit={can(role, "manageBusiness")} />
       )}

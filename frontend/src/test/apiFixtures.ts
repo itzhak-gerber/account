@@ -248,6 +248,7 @@ const DOCUMENT = {
   vat_amount: "108.00",
   notes: "",
   allocation_number: null,
+  allocation_status: null,
   amount_paid: "0.00",
   amount_credited: "0.00",
   allocations: [],
@@ -292,6 +293,16 @@ const AGING = {
 /** The JSON body the API would return for `url` (lists default to empty). */
 export function fixtureBody(url: string, me: unknown = ME): unknown {
   if (url.includes("uninvoiced=true")) return DELIVERY_NOTES;
+  if (url.endsWith("/ita"))
+    return {
+      enabled: true,
+      environment: "sandbox",
+      connected: true,
+      connected_at: "2026-10-01T10:00:00Z",
+      expires_at: "2026-12-30T10:00:00Z",
+      threshold: "5000",
+      redirect_uri: "https://invoice.example/api/v1/ita/callback",
+    };
   const path = url.replace(/^\/api\/v1/, "").split("?")[0];
   const routes: [RegExp, unknown][] = [
     [/^\/me$/, me],

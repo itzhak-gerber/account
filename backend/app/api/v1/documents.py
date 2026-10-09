@@ -23,7 +23,7 @@ from app.schemas.documents import (
     NumberingIn,
     NumberingOut,
 )
-from app.services import audit, delivery, documents, numbering
+from app.services import allocation, audit, delivery, documents, numbering
 from app.services.document_rules import RULES, allowed_types
 from app.services.permissions import Permission, require
 
@@ -111,8 +111,30 @@ async def delete_draft(ctx: CurrentBusiness, document_id: uuid.UUID, session: Db
 
 
 @router.post("/documents/{document_id}/issue")
-async def issue(ctx: CurrentBusiness, document_id: uuid.UUID, session: DbSession) -> DocumentOut:
-    document = await documents.issue(session, ctx, document_id)
+async def issue(
+    ctx: CurrentBusiness,
+    document_id: uuid.UUID,
+    session: DbSession,
+    without_allocation: bool = False,
+) -> DocumentOut:
+    """Issue a draft. If a needed allocation number cannot be obtained, the answer is 409
+    (allocation_failed / allocation_rejected); repeat with without_allocation=true to issue
+    anyway and have the number requested in the background."""
+    document = await documents.issue(
+        session, ctx, document_id, without_allocation=without_allocation
+    )
+    out = await documents.to_out(session, document)
+    await commit(session)
+    return out
+
+
+@router.post("/documents/{document_id}/allocation")
+async def request_allocation(
+    ctx: CurrentBusiness, document_id: uuid.UUID, session: DbSession
+) -> DocumentOut:
+    """Ask the tax authority again for the allocation number of an issued invoice."""
+    await allocation.retry_now(session, ctx, document_id)
+    document = await documents.get_document(session, ctx, document_id)
     out = await documents.to_out(session, document)
     await commit(session)
     return out

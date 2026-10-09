@@ -25,7 +25,7 @@ from app.models import (
     ExportStatus,
     OutboxEvent,
 )
-from app.services import events, exports, notifications, push
+from app.services import allocation, events, exports, notifications, push
 from app.services.documents import today
 
 log = structlog.get_logger()
@@ -104,6 +104,20 @@ async def build_export(ctx: dict[str, Any], *, export_id: str, business_id: str)
                 failed.finished_at = datetime.now(UTC)
                 await commit(session)
             return "failed"
+
+
+async def retry_allocation(ctx: dict[str, Any], *, business_id: str, document_id: str) -> str:
+    """Ask the tax authority again for an invoice issued without its allocation number.
+    Waits longer after each failure (1 minute, doubling, at most 6 hours)."""
+    async with get_sessionmaker()() as session:
+        await set_rls_context(session, business_id=uuid.UUID(business_id))
+        result = await allocation.retry(session, uuid.UUID(business_id), uuid.UUID(document_id))
+        await commit(session)
+    log.info("ita.retry", document_id=document_id, result=result)
+    if result == "pending":
+        attempt = int(ctx.get("job_try", 1))
+        raise Retry(defer=min(60 * 2 ** (attempt - 1), 6 * 3600))
+    return result
 
 
 async def _record(
@@ -290,6 +304,8 @@ class WorkerSettings:
         func(send_push, max_tries=1),
         # One PDF per document: allow long exports, and do not retry a failed one.
         func(build_export, timeout=3600, max_tries=1),
+        # About three days of tries before someone has to press "ask again".
+        func(retry_allocation, max_tries=20),
         # No stored result, so the next "kick" with the same job id is accepted right away.
         func(dispatch_outbox, name=events.DISPATCH_JOB, keep_result=0),
         raise_overdue_events,

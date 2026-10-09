@@ -5,7 +5,14 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
 
-from app.models import DocumentStatus, DocumentType, PaymentMethod, RelationType, VatType
+from app.models import (
+    AllocationStatus,
+    DocumentStatus,
+    DocumentType,
+    PaymentMethod,
+    RelationType,
+    VatType,
+)
 from app.schemas.catalog import OptionalTaxId, Text20, Text30, Text100, Text200, Text2000
 
 # superseded: a proforma replaced by the tax invoice issued from it.
@@ -164,6 +171,9 @@ class DocumentOut(BaseModel):
     # Invoices only: what is paid, credited and still open.
     payment_status: PaymentStatus | None
     delivery_status: DeliveryNoteStatus | None
+    # Tax invoices: approved (has its allocation number), pending (issued without it, being
+    # retried) or rejected by the tax authority; None when not needed.
+    allocation_status: AllocationStatus | None = None
     amount_paid: Decimal
     amount_credited: Decimal
     balance_due: Decimal | None

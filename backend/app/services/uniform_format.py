@@ -123,7 +123,7 @@ async def _bases(
     return {doc_id: bases[0] for doc_id, bases in found.items() if len(bases) == 1}
 
 
-def _sales_line(document: Document, line: Any, items: dict[uuid.UUID, Item]) -> of.Line:
+def net_line(document: Document, line: Any, items: dict[uuid.UUID, Item]) -> of.Line:
     standard = line.vat_type == VatType.STANDARD
     # Prices typed including VAT are reported before VAT, as the specification asks.
     divisor = 1 + document.vat_rate if document.prices_include_vat and standard else Decimal(1)
@@ -183,7 +183,7 @@ async def _sales(
     bases = await _bases(session, documents)
     result = []
     for d in documents:
-        lines = [_sales_line(d, line, items) for line in d.lines]
+        lines = [net_line(d, line, items) for line in d.lines]
         base = bases.get(d.id)
         if base:
             for line in lines:

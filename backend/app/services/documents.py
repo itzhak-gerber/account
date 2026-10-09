@@ -46,7 +46,16 @@ from app.schemas.documents import (
     PaymentStatus,
     RelatedDocument,
 )
-from app.services import audit, branding, catalog, events, inventory, numbering, vat
+from app.services import allocation as allocation_numbers
+from app.services import (
+    audit,
+    branding,
+    catalog,
+    events,
+    inventory,
+    numbering,
+    vat,
+)
 from app.services.calc import ZERO, LineInput, compute_totals, money
 from app.services.document_rules import (
     BILLS_DELIVERY_NOTES,
@@ -384,6 +393,7 @@ async def to_out(session: AsyncSession, document: Document) -> DocumentOut:
         allocation_number=document.allocation_number,
         payment_status=status,
         delivery_status=delivery_status(document),
+        allocation_status=await allocation_numbers.latest_status(session, document),
         amount_paid=document.amount_paid,
         amount_credited=document.amount_credited,
         balance_due=balance,
@@ -917,8 +927,18 @@ async def references_for(session: AsyncSession, document: Document) -> list[str]
     return lines
 
 
-async def issue(session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID) -> Document:
-    """Assign the next number, freeze the document, store the original PDF. Irreversible."""
+async def issue(
+    session: AsyncSession,
+    ctx: BusinessContext,
+    document_id: uuid.UUID,
+    *,
+    without_allocation: bool = False,
+) -> Document:
+    """Assign the next number, freeze the document, store the original PDF. Irreversible.
+
+    A tax invoice that needs an allocation number gets it before the PDF is made; if the tax
+    authority cannot give one, issuing stops unless ``without_allocation`` (then it is retried
+    in the background)."""
     require(ctx.role, Permission.ISSUE_DOCUMENTS)
     document = await _load(session, ctx, document_id, lock=True)
     _require_draft(document)
@@ -936,6 +956,9 @@ async def issue(session: AsyncSession, ctx: BusinessContext, document_id: uuid.U
     document.business_snapshot = _business_snapshot(business)
     document.issued_at = datetime.now(UTC)
     document.issued_by_user_id = ctx.principal.user_id
+    await allocation_numbers.on_issue(
+        session, ctx, business, document, allow_without=without_allocation
+    )
     await inventory.apply_document(session, ctx, document)
 
     pdf = await render_pdf(

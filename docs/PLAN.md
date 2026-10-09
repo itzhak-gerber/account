@@ -491,7 +491,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
 | **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links, documents emailed to customers (PDF attached, logo inline, retries, delivery history) |
 | **M5** | Notifications | ✅ in-app inbox (bell), email notifications, preferences screen, MCP tools, outbox dispatcher, daily overdue check; new-device sign-in alerts, daily summary email; phone/desktop push (installable PWA + Web Push with VAPID; per-event "on the phone" channel; only the title is pushed, never amounts or names; endpoints limited to the browsers' push services) |
-| **M6** | Israeli compliance | ✅ full data export (Settings → ייצוא נתונים: ZIP with a PDF copy of every issued document, an Excel workbook of documents/lines/payments/customers/items, README; built in the background, downloadable for 7 days, owners/admins/accountants, audited). Inventory stages A (stock, kits), B (purchasing) and C (delivery notes, consolidated invoices) done (§10). ✅ Uniform format OPENFRMT 1.31 in the same ZIP (see the M6 notes below). Next: ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
+| **M6** | Israeli compliance | ✅ full data export (Settings → ייצוא נתונים: ZIP with a PDF copy of every issued document, an Excel workbook of documents/lines/payments/customers/items, README; built in the background, downloadable for 7 days, owners/admins/accountants, audited). Inventory stages A (stock, kits), B (purchasing) and C (delivery notes, consolidated invoices) done (§10). ✅ Uniform format OPENFRMT 1.31 in the same ZIP (see the M6 notes below). ✅ ITA allocation numbers, built and tested against a fake tax authority, off until the software is registered (notes below); next: sandbox test with real credentials |
 | **M7** | Reports and dashboard | ✅ income and VAT per period (taxable / zero-rated / exempt), money received by payment method, open balances with aging, Excel export, dashboard figures and 12-month chart, MCP `get_report` |
 | **M7b** | Accessibility | 🟡 Israeli Standard 5568 (= WCAG 2.0 AA, required by law for services to the public). Done: axe on every screen in unit tests and in Chromium (contrast; desktop and phone) in CI, Keycloak login/registration pages checked, skip link, page titles and focus on navigation, semantic lists/links, keyboard-scrollable tables, accessible chart, AA colour contrast, tagged PDFs (PDF/UA), public accessibility statement page (`/accessibility`). Remaining: accessibility coordinator's contact details for the statement, a manual screen-reader pass (NVDA / VoiceOver / TalkBack) |
 | **M8** | Production hardening | Azure staging + production, observability, backups/restore drill, load test, security review and pen test, privacy policy and terms |
@@ -519,7 +519,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
   logo they were issued with.
 - A tax invoice (or invoice-receipt) issued from a proforma replaces it: the proforma is marked
   `superseded` (no longer owed) and what was paid on it counts as paid on the tax invoice.
-- Not yet: allocation numbers (feature flag, off), customer tax-ID threshold rules for allocation.
+- Allocation numbers: see the M6 allocation notes.
 
 ### M6 uniform format (OPENFRMT 1.31) notes
 
@@ -550,6 +550,27 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 - To verify before production: run an exported file through the tax authority's validation
   tool (simulator) and confirm the system constant `&OF1.31&` and the open points above with a CPA.
 
+### M6 allocation numbers (מספרי הקצאה) notes
+
+- Off unless `APP_ITA_ALLOCATION_ENABLED` and the software's client ID / secret / token key are
+  set (`Settings.ita_configured`); setup steps in `infra/azure/README.md`.
+- Each business connects once (Settings → רשות המסים, owners/admins): OAuth authorization code
+  at the tax authority, state signed and bound to the user, tokens stored encrypted (Fernet,
+  key in Key Vault) in `ita_connections`, refreshed when the access token expires.
+- Needed when: tax invoice or tax invoice/receipt, the customer has a tax ID, and the amount
+  before VAT is above the threshold for the invoice date (25,000 from 5/2024; 20,000 in 2025;
+  10,000 from 1/2026; 5,000 from 6/2026; `allocation.THRESHOLDS`, to be checked against the
+  current schedule).
+- Requested while issuing, after the number is assigned and before the original PDF, so the
+  number is printed on it. If the tax authority is down, issuing stops (409
+  `allocation_failed`); the user may issue anyway (`without_allocation=true`), and a worker job
+  retries with growing waits for about three days. A refusal (`allocation_rejected`) is not
+  retried automatically; "בקשה חוזרת" on the invoice asks again. Not connected:
+  `ita_not_connected`. Every request and answer is kept in `allocation_requests`.
+- Wire format (paths `/{tsandbox|production}/longtimetoken/oauth2/...` and
+  `/Invoices/v2/Approval`, field names, how the number is read from the answer) is isolated in
+  `services/ita_client.py`; confirm it in the sandbox before production.
+
 ### M7 implementation notes (for CPA review)
 
 - Reports read the totals stored on issued documents; drafts are never included. Amounts are ILS.
@@ -575,7 +596,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | 2 | Identity provider | **Keycloak**, self-hosted (free in development; in production only its container + DB cost) |
 | 3 | Product model | **Multi-tenant SaaS** for many businesses |
 | 4 | v1 document types | **All six**, plus delivery notes (תעודת משלוח) with the inventory module |
-| 5 | ITA software registration | **Deferred.** Allocation numbers are built behind a feature flag |
+| 5 | ITA software registration | **Deferred.** Allocation numbers are built behind a feature flag (done; waiting for registration and a sandbox test) |
 | 6 | Inventory | Built in stages (§10): one warehouse, weighted-average cost, negative stock allowed with a warning, sales kits one level deep |
 | 7 | Phone notifications | PWA + Web Push first; WhatsApp/SMS later (§9) |
 | 8 | Infrastructure as code | **Bicep** instead of Terraform: native to Azure and Cloud Shell, no state storage to run, compiled and linted in CI. Azure-specific code would not carry over to AWS with either tool |

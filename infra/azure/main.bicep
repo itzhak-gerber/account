@@ -34,6 +34,15 @@ param postgresSku string = 'Standard_B1ms'
 param postgresTier string = 'Burstable'
 @description('Availability zone for PostgreSQL ("1", "2", "3"), or empty to let Azure choose.')
 param postgresZone string = ''
+@description('Tax authority allocation numbers: client ID of this software (an identifier).')
+param itaClientId string = ''
+@description('Allocation numbers on ("true") or off.')
+param itaEnabled string = 'false'
+@allowed([
+  'sandbox'
+  'production'
+])
+param itaEnvironment string = 'sandbox'
 
 var tags = {
   app: prefix
@@ -348,6 +357,9 @@ module apps 'modules/apps.bicep' = if (stage == 'apps') {
     storageAccountUrl: storage.properties.primaryEndpoints.blob
     smtpUsername: smtpUsername
     smtpFrom: 'DoNotReply@${emailDomain.properties.mailFromSenderDomain}'
+    itaClientId: itaClientId
+    itaEnabled: itaEnabled
+    itaEnvironment: itaEnvironment
   }
   dependsOn: [registryPull, vaultSecretsUser, storageBlobContributor, smtpUser, filesContainer]
 }

@@ -14,6 +14,9 @@ param postgresFqdn string
 param storageAccountUrl string
 param smtpUsername string
 param smtpFrom string
+param itaClientId string
+param itaEnabled string
+param itaEnvironment string
 
 var appHost = 'invoice.${defaultDomain}'
 var appUrl = 'https://${appHost}'
@@ -46,6 +49,8 @@ var backendSecretNames = [
   'app-secret-key'
   'smtp-password'
   'vapid-private-key'
+  'ita-client-secret'
+  'ita-token-key'
 ]
 
 var backendEnv = [
@@ -67,6 +72,11 @@ var backendEnv = [
   { name: 'APP_SMTP_USERNAME', value: smtpUsername }
   { name: 'APP_SMTP_PASSWORD', secretRef: 'smtp-password' }
   { name: 'APP_VAPID_PRIVATE_KEY', secretRef: 'vapid-private-key' }
+  { name: 'APP_ITA_ALLOCATION_ENABLED', value: itaEnabled }
+  { name: 'APP_ITA_ENVIRONMENT', value: itaEnvironment }
+  { name: 'APP_ITA_CLIENT_ID', value: itaClientId }
+  { name: 'APP_ITA_CLIENT_SECRET', secretRef: 'ita-client-secret' }
+  { name: 'APP_ITA_TOKEN_KEY', secretRef: 'ita-token-key' }
   { name: 'APP_EMAIL_FROM', value: 'חשבוניות <${smtpFrom}>' }
   { name: 'APP_STORAGE_BACKEND', value: 'azure' }
   { name: 'APP_AZURE_STORAGE_ACCOUNT_URL', value: storageAccountUrl }

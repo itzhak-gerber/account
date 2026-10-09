@@ -99,6 +99,19 @@ export type DocumentType =
   | "credit_note"
   | "delivery_note";
 
+/** Tax invoices: their allocation number from the tax authority. */
+export type AllocationStatus = "approved" | "pending" | "rejected";
+
+export interface ItaStatus {
+  enabled: boolean;
+  environment: "sandbox" | "production";
+  connected: boolean;
+  connected_at: string | null;
+  expires_at: string | null;
+  threshold: string | null;
+  redirect_uri: string;
+}
+
 /** Delivery notes: "invoiced" once an issued invoice bills them. */
 export type DeliveryNoteStatus = "open" | "invoiced";
 export type DocumentStatus = "draft" | "issued";
@@ -367,6 +380,7 @@ export interface InvoiceDocument {
   allocation_number: string | null;
   payment_status: PaymentStatus | null;
   delivery_status: DeliveryNoteStatus | null;
+  allocation_status: AllocationStatus | null;
   amount_paid: string;
   amount_credited: string;
   balance_due: string | null;

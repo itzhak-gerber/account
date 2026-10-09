@@ -37,6 +37,11 @@ jobs:
       # Region for the network, database and apps (Sweden Central refused every database
       # size to this subscription). Optional AZURE_ENV field to change it.
       COMPUTE_LOCATION: ${{ fromJSON(vars.AZURE_ENV).computeLocation || 'northeurope' }}
+      # Tax authority allocation numbers: off until the software is registered. The client ID
+      # is an identifier; the client secret is only in Key Vault (ita-client-secret).
+      ITA_CLIENT_ID: ${{ fromJSON(vars.AZURE_ENV).itaClientId || '' }}
+      ITA_ENABLED: ${{ fromJSON(vars.AZURE_ENV).itaEnabled || 'false' }}
+      ITA_ENVIRONMENT: ${{ fromJSON(vars.AZURE_ENV).itaEnvironment || 'sandbox' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -86,6 +91,17 @@ jobs:
             az keyvault secret set --vault-name "$VAULT" --name vapid-private-key -o none --value \
               "$(openssl ecparam -name prime256v1 -genkey -noout -outform DER | basenc --base64url -w0 | tr -d '=')"
             echo "created vapid-private-key"
+          fi
+          # Encrypts the businesses' tax authority tokens (Fernet: 32 bytes, base64url).
+          if ! az keyvault secret show --vault-name "$VAULT" --name ita-token-key -o none 2>/dev/null; then
+            az keyvault secret set --vault-name "$VAULT" --name ita-token-key -o none \
+              --value "$(openssl rand -base64 32 | tr '+/' '-_')"
+            echo "created ita-token-key"
+          fi
+          # The tax authority client secret is put here by hand; "unset" keeps the feature off.
+          if ! az keyvault secret show --vault-name "$VAULT" --name ita-client-secret -o none 2>/dev/null; then
+            az keyvault secret set --vault-name "$VAULT" --name ita-client-secret -o none --value unset
+            echo "created ita-client-secret placeholder"
           fi
 
       - name: Infrastructure (network, database, storage, registry, email)
@@ -193,6 +209,8 @@ jobs:
                          emailRoleId="$EMAIL_ROLE" postgresSku="$PG_SKU" \
                          postgresTier="$PG_TIER" postgresZone="$PG_ZONE" \
                          computeLocation="$COMPUTE_LOCATION" \
+                         itaClientId="$ITA_CLIENT_ID" itaEnabled="$ITA_ENABLED" \
+                         itaEnvironment="$ITA_ENVIRONMENT" \
             --query properties.outputs -o json > apps.json
           echo "app_url=$(jq -r .appUrl.value apps.json)" >> "$GITHUB_OUTPUT"
           echo "auth_url=$(jq -r .authUrl.value apps.json)" >> "$GITHUB_OUTPUT"

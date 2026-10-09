@@ -29,6 +29,7 @@ const SCREENS = [
   ["notifications", "/notifications"],
   ["settings", "/settings"],
   ["data export", "/settings?tab=export"],
+  ["tax authority", "/settings?tab=ita"],
   ["profile", "/profile"],
   ["accessibility statement", "/accessibility"],
   ["onboarding", "/", { ...ME, memberships: [] }],

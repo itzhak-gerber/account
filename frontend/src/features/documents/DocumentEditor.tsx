@@ -19,7 +19,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
-import { api } from "../../api/client";
+import { api, ApiError } from "../../api/client";
 import type {
   CustomerDetails,
   DocumentType,
@@ -49,6 +49,8 @@ const EMPTY_CUSTOMER: CustomerDetails = {
   address_city: "",
   address_zip: "",
 };
+
+const ALLOCATION_CODES = ["allocation_failed", "allocation_rejected", "ita_not_connected"];
 
 interface EditorState {
   issue_date: string;
@@ -217,17 +219,26 @@ export function DocumentEditor({ businessId, type, info, document, payInvoice }:
     },
     onSuccess: invalidate,
   });
+  // The tax authority could not give an allocation number: offer to issue without it.
+  const [allocationProblem, setAllocationProblem] = useState<string | null>(null);
   const issue = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (withoutAllocation: boolean = false) => {
       const saved = await save.mutateAsync();
-      return api.post<InvoiceDocument>(`${base}/${saved.id}/issue`);
+      const query = withoutAllocation ? "?without_allocation=true" : "";
+      return api.post<InvoiceDocument>(`${base}/${saved.id}/issue${query}`);
     },
     onSuccess: async (issued) => {
       setConfirmIssue(false);
+      setAllocationProblem(null);
       await invalidate();
       void navigate(`/documents/${issued.id}`, { replace: true });
     },
-    onError: () => setConfirmIssue(false),
+    onError: (err) => {
+      setConfirmIssue(false);
+      if (err instanceof ApiError && ALLOCATION_CODES.includes(err.code)) {
+        setAllocationProblem(err.code);
+      }
+    },
   });
   const remove = useMutation({
     mutationFn: () => api.delete(`${base}/${docId}`),
@@ -241,7 +252,7 @@ export function DocumentEditor({ businessId, type, info, document, payInvoice }:
     window.open(pdfUrl(businessId, saved.id), "_blank", "noopener");
   };
 
-  const error = issue.error ?? save.error ?? remove.error;
+  const error = (allocationProblem ? null : issue.error) ?? save.error ?? remove.error;
   const busy = save.isPending || issue.isPending;
   const canEdit = can(current?.role, "editDocuments");
 
@@ -470,8 +481,32 @@ export function DocumentEditor({ businessId, type, info, document, payInvoice }:
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmIssue(false)}>{t("common.cancel")}</Button>
-          <Button variant="contained" disabled={issue.isPending} onClick={() => issue.mutate()}>
+          <Button
+            variant="contained"
+            disabled={issue.isPending}
+            onClick={() => issue.mutate(false)}
+          >
             {t("editor.issue")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={allocationProblem !== null} onClose={() => setAllocationProblem(null)}>
+        <DialogTitle>{t("allocation.problemTitle")}</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 1 }}>
+            {t(`errors.${allocationProblem ?? "allocation_failed"}`)}
+          </Typography>
+          <Typography color="text.secondary">
+            {allocationProblem === "allocation_failed"
+              ? t("allocation.withoutRetried")
+              : t("allocation.withoutManual")}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAllocationProblem(null)}>{t("common.cancel")}</Button>
+          <Button variant="contained" disabled={issue.isPending} onClick={() => issue.mutate(true)}>
+            {t("allocation.issueWithout")}
           </Button>
         </DialogActions>
       </Dialog>
