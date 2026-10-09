@@ -68,6 +68,8 @@ export interface DataExport {
   expires_at: string | null;
   size: number | null;
   documents: number | null;
+  date_from: string | null;
+  date_to: string | null;
   downloadable: boolean;
 }
 

@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = False
     email_from: str = "חשבוניות <noreply@invoice.local>"
 
+    # Uniform-format file (מבנה אחיד). The registration number is issued by the tax authority
+    # when the software is registered; 0 until then.
+    openformat_software_name: str = "חשבוניות"
+    openformat_registration_number: str = "0"
+    openformat_maker_tax_id: str = "0"
+    openformat_maker_name: str = ""
+
     # Web Push (VAPID). The private key is base64url DER (EC P-256); empty disables push.
     vapid_private_key: str = ""
     # Contact for push services (mailto: or https URL); defaults to the public URL.

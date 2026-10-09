@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -14,4 +14,13 @@ class DataExportOut(BaseModel):
     expires_at: datetime | None
     size: int | None
     documents: int | None
+    date_from: date | None
+    date_to: date | None
     downloadable: bool
+
+
+class ExportRequest(BaseModel):
+    """Range of the uniform-format file, by document date (default: everything until today)."""
+
+    date_from: date | None = None
+    date_to: date | None = None

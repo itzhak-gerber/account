@@ -491,7 +491,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
 | **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links, documents emailed to customers (PDF attached, logo inline, retries, delivery history) |
 | **M5** | Notifications | ✅ in-app inbox (bell), email notifications, preferences screen, MCP tools, outbox dispatcher, daily overdue check; new-device sign-in alerts, daily summary email; phone/desktop push (installable PWA + Web Push with VAPID; per-event "on the phone" channel; only the title is pushed, never amounts or names; endpoints limited to the browsers' push services) |
-| **M6** | Israeli compliance | ✅ full data export (Settings → ייצוא נתונים: ZIP with a PDF copy of every issued document, an Excel workbook of documents/lines/payments/customers/items, README; built in the background, downloadable for 7 days, owners/admins/accountants, audited). Inventory stages A (stock, kits), B (purchasing) and C (delivery notes, consolidated invoices) done (§10); next OPENFRMT 1.31 (spec in docs/) added to the same ZIP; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
+| **M6** | Israeli compliance | ✅ full data export (Settings → ייצוא נתונים: ZIP with a PDF copy of every issued document, an Excel workbook of documents/lines/payments/customers/items, README; built in the background, downloadable for 7 days, owners/admins/accountants, audited). Inventory stages A (stock, kits), B (purchasing) and C (delivery notes, consolidated invoices) done (§10). ✅ Uniform format OPENFRMT 1.31 in the same ZIP (see the M6 notes below). Next: ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
 | **M7** | Reports and dashboard | ✅ income and VAT per period (taxable / zero-rated / exempt), money received by payment method, open balances with aging, Excel export, dashboard figures and 12-month chart, MCP `get_report` |
 | **M7b** | Accessibility | 🟡 Israeli Standard 5568 (= WCAG 2.0 AA, required by law for services to the public). Done: axe on every screen in unit tests and in Chromium (contrast; desktop and phone) in CI, Keycloak login/registration pages checked, skip link, page titles and focus on navigation, semantic lists/links, keyboard-scrollable tables, accessible chart, AA colour contrast, tagged PDFs (PDF/UA), public accessibility statement page (`/accessibility`). Remaining: accessibility coordinator's contact details for the statement, a manual screen-reader pass (NVDA / VoiceOver / TalkBack) |
 | **M8** | Production hardening | Azure staging + production, observability, backups/restore drill, load test, security review and pen test, privacy policy and terms |
@@ -520,6 +520,35 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 - A tax invoice (or invoice-receipt) issued from a proforma replaces it: the proforma is marked
   `superseded` (no longer owed) and what was paid on it counts as paid on the tax invoice.
 - Not yet: allocation numbers (feature flag, off), customer tax-ID threshold rules for allocation.
+
+### M6 uniform format (OPENFRMT 1.31) notes
+
+- Spec: `docs/Service_Pages_Income_tax_horaot-131.pdf`. Formatter `app/openformat.py`
+  (fixed-width records, every length checked; tests read fields back by the spec's columns),
+  data collection `app/services/uniform_format.py`.
+- The export ZIP holds `OPENFRMT/<first 8 digits of the tax ID>.<yy>/<MMDDhhmm>/` with
+  `INI.TXT` (A000 + one summary per record type), `BKMVDATA.zip` (BKMVDATA.TXT) and
+  `OPENFRMT_REPORT.txt` (the appendix-4 printout with the §2.6 count and total per document type).
+  ISO-8859-8 logical Hebrew, CR LF after every record, a new random 15-digit main ID per run.
+- Multi-year software (1011 = 2). The user may give a date range (by document date); without
+  one it runs from the first document (sales or purchasing) to today.
+- Records: A100, C100, D110, D120, M100, Z900. No B100/B110 (not a double-entry ledger, 1013 = 0).
+- Document codes (appendix 1): delivery note 200, proforma 300, tax invoice 305, tax
+  invoice/receipt 320, credit note 330, receipt 400, purchase order 500, goods receipt 600,
+  supplier invoice 700. Quotes have no code and are left out; drafts too.
+- Amounts before VAT; prices typed including VAT are converted. Discounts are per line (1266,
+  negative); the document discount (1220) is 0. Receipts put the amount received in
+  1219/1221/1223. A document based on exactly one other (invoice on its delivery note, credit
+  note on its invoice, goods receipt on its order) carries it in 1256/1257.
+- Customer/supplier key (1225): the first 15 hex characters of its ID; "0" for a customer typed
+  only on the document. Operator (1233) and branches are not filled.
+- M100: stock-tracked products; opening quantity before the range, in and out during it (by
+  the date the movement was recorded), current weighted-average cost. The internal catalogue
+  number is the SKU when it is unique, otherwise the item ID.
+- 1006 (software registration number) is 0 until the software is registered with the tax
+  authority (setting `OPENFRMT_REGISTRATION_NUMBER`, with the maker's details).
+- To verify before production: run an exported file through the tax authority's validation
+  tool (simulator) and confirm the system constant `&OF1.31&` and the open points above with a CPA.
 
 ### M7 implementation notes (for CPA review)
 

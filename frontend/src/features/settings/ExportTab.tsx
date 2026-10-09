@@ -8,13 +8,16 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
 import type { DataExport } from "../../api/types";
 import { errorMessage } from "../../lib/errors";
+import { formatDate } from "../../lib/money";
 
 function size(bytes: number | null): string {
   if (!bytes) return "";
@@ -38,8 +41,11 @@ export function ExportTab({ businessId }: { businessId: string }) {
     refetchInterval: (query) =>
       query.state.data?.some((e) => e.status === "pending") ? 3000 : false,
   });
+  // Range of the uniform-format file (מבנה אחיד); empty: from the first document until today.
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const start = useMutation({
-    mutationFn: () => api.post<DataExport>(base),
+    mutationFn: () => api.post<DataExport>(base, { date_from: from || null, date_to: to || null }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: key }),
   });
   const pending = exports.data?.some((e) => e.status === "pending") ?? false;
@@ -61,6 +67,30 @@ export function ExportTab({ businessId }: { businessId: string }) {
             {errorMessage(t, start.error)}
           </Alert>
         )}
+        <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>
+          {t("exports.openformatTitle")}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {t("exports.openformatHelp")}
+        </Typography>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+          <TextField
+            type="date"
+            size="small"
+            label={t("exports.from")}
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+          <TextField
+            type="date"
+            size="small"
+            label={t("exports.to")}
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+        </Stack>
         <Button
           variant="contained"
           disabled={start.isPending || pending}
@@ -111,6 +141,12 @@ export function ExportTab({ businessId }: { businessId: string }) {
                     e.status === "ready"
                       ? [
                           t("exports.documents", { count: e.documents ?? 0 }),
+                          e.date_from || e.date_to
+                            ? t("exports.range", {
+                                from: e.date_from ? formatDate(e.date_from) : "…",
+                                to: e.date_to ? formatDate(e.date_to) : "…",
+                              })
+                            : "",
                           size(e.size),
                           e.downloadable && e.expires_at
                             ? t("exports.until", { date: when(e.expires_at) })

@@ -327,6 +327,8 @@ export function fixtureBody(url: string, me: unknown = ME): unknown {
           expires_at: "2099-10-16T08:01:00Z",
           size: 2_400_000,
           documents: 12,
+          date_from: "2026-01-01",
+          date_to: "2026-10-09",
           downloadable: true,
         },
       ],

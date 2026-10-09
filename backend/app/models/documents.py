@@ -277,6 +277,9 @@ class DataExport(IdMixin, Base):
     storage_key: Mapped[str | None] = mapped_column(String(500))
     size: Mapped[int | None] = mapped_column(Integer)
     documents: Mapped[int | None] = mapped_column(Integer)
+    # Range of the uniform-format file (by document date); None: from the first document / today.
+    date_from: Mapped[date | None] = mapped_column(Date)
+    date_to: Mapped[date | None] = mapped_column(Date)
     error: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

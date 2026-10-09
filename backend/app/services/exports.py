@@ -9,16 +9,18 @@ it take everything with it at any time, or when the service ends. Built in the b
 import io
 import uuid
 import zipfile
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth.principal import BusinessContext
+from app.core.config import get_settings
 from app.core.db import after_commit
-from app.core.errors import Conflict, NotFound
+from app.core.errors import AppError, Conflict, NotFound
 from app.core.storage import get_storage
 from app.jobs import queue
 from app.models import (
@@ -34,7 +36,7 @@ from app.models import (
 )
 from app.pdf.render import PAYMENT_LABELS, render_pdf
 from app.reports.excel import export_xlsx
-from app.services import audit, branding
+from app.services import audit, branding, uniform_format
 from app.services import inventory as inventory_service
 from app.services.document_rules import RULES
 from app.services.documents import references_for
@@ -55,14 +57,26 @@ def _out(export: DataExport) -> dict[str, Any]:
         "expires_at": expires,
         "size": export.size,
         "documents": export.documents,
+        "date_from": export.date_from,
+        "date_to": export.date_to,
         "downloadable": export.status == ExportStatus.READY
         and expires is not None
         and expires > datetime.now(UTC),
     }
 
 
-async def request(session: AsyncSession, ctx: BusinessContext) -> dict[str, Any]:
+async def request(
+    session: AsyncSession,
+    ctx: BusinessContext,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> dict[str, Any]:
+    """Start an export. The date range applies to the uniform-format file; the PDFs and the
+    workbook always hold everything."""
     require(ctx.role, Permission.EXPORT_DATA)
+    if date_from and date_to and date_from > date_to:
+        raise AppError("The range ends before it starts", code="invalid_date_range")
     running = await session.scalar(
         select(DataExport.id).where(
             DataExport.business_id == ctx.business_id,
@@ -77,6 +91,8 @@ async def request(session: AsyncSession, ctx: BusinessContext) -> dict[str, Any]
         business_id=ctx.business_id,
         requested_by_user_id=ctx.principal.user_id,
         status=ExportStatus.PENDING,
+        date_from=date_from,
+        date_to=date_to,
         created_at=datetime.now(UTC),
     )
     session.add(export)
@@ -143,7 +159,11 @@ README = """ייצוא נתונים – {name} (מספר עוסק {tax_id})
 תוכן הקובץ:
 - documents/: עותק PDF של כל מסמך שהופק ({count} מסמכים), מסודר לפי שנה. העותקים מסומנים
   "העתק נאמן למקור"; קובץ המקור של כל מסמך נשמר במערכת.
-- data.xlsx: גיליונות של המסמכים, שורות המסמכים, אמצעי התשלום, הלקוחות והפריטים.
+- data.xlsx: גיליונות של המסמכים, שורות המסמכים, אמצעי התשלום, הלקוחות והפריטים (וגם מלאי,
+  ספקים וחשבוניות ספקים, אם יש).
+- {openformat}: קבצים במבנה אחיד של רשות המסים (גרסה 1.31) לתקופה {period}:
+  INI.TXT, ו-BKMVDATA.zip שבתוכו BKMVDATA.TXT, וגם OPENFRMT_REPORT.txt – דוח ההפקה.
+  אלה הקבצים שמוסרים לביקורת של רשות המסים כשהיא מבקשת אותם.
 
 על פי הוראות ניהול פנקסי חשבונות יש לשמור את רשומות העסק לתקופה הקבועה בדין (בדרך כלל
 שבע שנים). מומלץ לשמור את הקובץ הזה במקום בטוח, עם גיבוי.
@@ -189,8 +209,16 @@ async def build(session: AsyncSession, export_id: uuid.UUID) -> DataExport:
         )
     )
 
+    today = datetime.now(ZoneInfo(get_settings().timezone)).date()
+    period_from = export.date_from or await uniform_format.first_date(session, business.id) or today
+    period_to = export.date_to or today
+    uniform = await uniform_format.build(session, business, period_from, period_to)
+
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(f"{uniform.folder}/INI.TXT", uniform.ini)
+        archive.writestr(f"{uniform.folder}/BKMVDATA.zip", uniform.bkmvdata_zip)
+        archive.writestr(f"{uniform.folder}/OPENFRMT_REPORT.txt", uniform.report)
         logos: dict[str, bytes | None] = {}
         for document in documents:
             assert document.business_snapshot is not None
@@ -324,6 +352,8 @@ async def build(session: AsyncSession, export_id: uuid.UUID) -> DataExport:
                 tax_id=business.tax_id,
                 when=datetime.now(UTC).strftime("%d/%m/%Y %H:%M UTC"),
                 count=len(documents),
+                openformat=uniform.folder + "/",
+                period=f"{period_from:%d/%m/%Y}–{period_to:%d/%m/%Y}",
             ),
         )
 
