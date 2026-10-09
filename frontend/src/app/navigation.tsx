@@ -1,5 +1,6 @@
 import AssessmentOutlined from "@mui/icons-material/AssessmentOutlined";
 import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
+import LocalShippingOutlined from "@mui/icons-material/LocalShippingOutlined";
 import WarehouseOutlined from "@mui/icons-material/WarehouseOutlined";
 import PeopleOutlined from "@mui/icons-material/PeopleOutlined";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
@@ -21,6 +22,12 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "/customers", labelKey: "nav.customers", icon: <PeopleOutlined />, primary: true },
   { path: "/items", labelKey: "nav.items", icon: <Inventory2Outlined />, primary: false },
   { path: "/inventory", labelKey: "nav.inventory", icon: <WarehouseOutlined />, primary: false },
+  {
+    path: "/purchasing",
+    labelKey: "nav.purchasing",
+    icon: <LocalShippingOutlined />,
+    primary: false,
+  },
   { path: "/reports", labelKey: "nav.reports", icon: <AssessmentOutlined />, primary: false },
   { path: "/settings", labelKey: "nav.settings", icon: <SettingsOutlined />, primary: false },
 ];

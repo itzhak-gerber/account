@@ -10,6 +10,7 @@ from tests.helpers import app_client
 from tests.test_documents import issue, setup
 from tests.test_notifications import Jobs, team
 from tests.test_payments import get_doc, issued_invoice, make_receipt
+from tests.test_purchasing import supplier
 
 
 def export_jobs(jobs: Jobs) -> list[dict[str, Any]]:
@@ -24,6 +25,17 @@ async def test_full_export_has_every_document_and_the_data(idp: FakeIdP, sent_jo
             owner, bid, "1000", [{"invoice_id": invoice["id"], "amount": "1000"}]
         )
         await issue(owner, bid, receipt["id"])
+        north = await supplier(owner, bid)
+        await owner.post(
+            f"/api/v1/businesses/{bid}/supplier-invoices",
+            json={
+                "supplier_id": north["id"],
+                "invoice_number": "A-7",
+                "invoice_date": "2026-10-05",
+                "net_amount": "100",
+                "vat_amount": "18",
+            },
+        )
         sent_jobs.clear()
 
         started = await owner.post(f"/api/v1/businesses/{bid}/exports")
@@ -55,7 +67,16 @@ async def test_full_export_has_every_document_and_the_data(idp: FakeIdP, sent_jo
 
         workbook = load_workbook(io.BytesIO(archive.read("data.xlsx")))
         # No stock-tracked products here, so no inventory sheet.
-        assert workbook.sheetnames == ["מסמכים", "שורות", "תקבולים", "לקוחות", "פריטים"]
+        assert workbook.sheetnames == [
+            "מסמכים",
+            "שורות",
+            "תקבולים",
+            "לקוחות",
+            "פריטים",
+            "ספקים",
+            "חשבוניות ספקים",
+        ]
+        assert workbook["חשבוניות ספקים"].cell(row=5, column=7).value == 118
         assert workbook["מסמכים"].max_row == 4 + 2  # header rows + two documents
         assert workbook["תקבולים"].max_row >= 5
 

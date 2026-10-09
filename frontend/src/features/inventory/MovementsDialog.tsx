@@ -75,6 +75,10 @@ export function MovementsDialog({
                         <Link component={RouterLink} to={`/documents/${m.document_id}`}>
                           {m.kit_item_id ? t("inventory.viaKit") : t("inventory.document")}
                         </Link>
+                      ) : m.goods_receipt_id ? (
+                        <Link component={RouterLink} to="/purchasing?tab=receipts">
+                          {t("inventory.goodsReceipt")}: {m.reason}
+                        </Link>
                       ) : (
                         m.reason
                       )}

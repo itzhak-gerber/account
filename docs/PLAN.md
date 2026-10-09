@@ -376,8 +376,28 @@ sales kits one level deep.
   their components); issuing is still allowed.
 - The data export gets a "מלאי" sheet.
 
-**Stage B (next): purchasing.** Suppliers, purchase orders, goods receipts (receipt movements
-with cost, updating the average), supplier invoices.
+**Stage B ✅ (purchasing)** — the רכש screen:
+
+- Suppliers (like customers, with a contact person; archived suppliers stay on old records).
+- Purchase orders, numbered per business, with lines (a catalog item or free text such as
+  freight) and cost per unit before VAT. Editable until goods start arriving; status open →
+  partly received → received, or cancelled (cancelling closes what has not arrived; received
+  goods stay in stock). Only product lines count towards "received".
+- Goods receipts (קליטת סחורה), from an order (prefilled with what is still due) or without
+  one, with the supplier's delivery-note number. Each line brings stock in at its cost and
+  updates the weighted average (`stock_movements.goods_receipt_id`). Receipts are never changed
+  or deleted (the database allows inserts only); mistakes are corrected with a stock adjustment.
+- Supplier invoices: supplier's invoice number (unique per supplier), date, due date, net and
+  VAT (VAT suggested at the current rate, editable), optional link to an order, paid date.
+  Open balance and overdue amount shown on the screen. An invoice entered by mistake can be
+  deleted; the audit log keeps it. The invoice amount does not change stock cost (the
+  receipt's cost does).
+- Permissions: owners, admins and members manage purchasing; accountants view it; viewers do
+  not see it.
+- The data export gets "ספקים" and "חשבוניות ספקים" sheets.
+
+Later, if needed: price differences between invoice and receipt (landed cost), supplier
+returns, attaching a scan of the supplier invoice, input-VAT (מע״מ תשומות) in the VAT report.
 
 **Stage C: delivery note (תעודת משלוח)** for goods delivered before the invoice, and possibly a
 return note; the invoice made from a delivery note does not take stock out twice.
@@ -458,7 +478,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
 | **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links, documents emailed to customers (PDF attached, logo inline, retries, delivery history) |
 | **M5** | Notifications | ✅ in-app inbox (bell), email notifications, preferences screen, MCP tools, outbox dispatcher, daily overdue check; new-device sign-in alerts, daily summary email; phone/desktop push (installable PWA + Web Push with VAPID; per-event "on the phone" channel; only the title is pushed, never amounts or names; endpoints limited to the browsers' push services) |
-| **M6** | Israeli compliance | ✅ full data export (Settings → ייצוא נתונים: ZIP with a PDF copy of every issued document, an Excel workbook of documents/lines/payments/customers/items, README; built in the background, downloadable for 7 days, owners/admins/accountants, audited). Inventory stage A done (§10); next purchasing (stage B), delivery notes (stage C), then OPENFRMT 1.31 (spec in docs/) added to the same ZIP; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
+| **M6** | Israeli compliance | ✅ full data export (Settings → ייצוא נתונים: ZIP with a PDF copy of every issued document, an Excel workbook of documents/lines/payments/customers/items, README; built in the background, downloadable for 7 days, owners/admins/accountants, audited). Inventory stages A (stock, kits) and B (purchasing) done (§10); next delivery notes (stage C), then OPENFRMT 1.31 (spec in docs/) added to the same ZIP; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
 | **M7** | Reports and dashboard | ✅ income and VAT per period (taxable / zero-rated / exempt), money received by payment method, open balances with aging, Excel export, dashboard figures and 12-month chart, MCP `get_report` |
 | **M7b** | Accessibility | 🟡 Israeli Standard 5568 (= WCAG 2.0 AA, required by law for services to the public). Done: axe on every screen in unit tests and in Chromium (contrast; desktop and phone) in CI, Keycloak login/registration pages checked, skip link, page titles and focus on navigation, semantic lists/links, keyboard-scrollable tables, accessible chart, AA colour contrast, tagged PDFs (PDF/UA), public accessibility statement page (`/accessibility`). Remaining: accessibility coordinator's contact details for the statement, a manual screen-reader pass (NVDA / VoiceOver / TalkBack) |
 | **M8** | Production hardening | Azure staging + production, observability, backups/restore drill, load test, security review and pen test, privacy policy and terms |

@@ -18,6 +18,7 @@ import { LandingPage } from "../pages/LandingPage";
 import { NotificationsPage } from "../pages/NotificationsPage";
 import { OnboardingPage } from "../pages/OnboardingPage";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
+import { PurchasingPage } from "../pages/PurchasingPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { ReportsPage } from "../pages/ReportsPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -39,7 +40,16 @@ function AuthenticatedRoutes() {
   if (!me) return <LandingPage />;
 
   const hasBusiness = me.memberships.length > 0;
-  const built = ["/", "/settings", "/documents", "/customers", "/items", "/inventory", "/reports"];
+  const built = [
+    "/",
+    "/settings",
+    "/documents",
+    "/customers",
+    "/items",
+    "/inventory",
+    "/purchasing",
+    "/reports",
+  ];
   const placeholders = NAV_ITEMS.filter((item) => !built.includes(item.path));
 
   return (
@@ -57,6 +67,7 @@ function AuthenticatedRoutes() {
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/items" element={<ItemsPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
+              <Route path="/purchasing" element={<PurchasingPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               {placeholders.map((item) => (

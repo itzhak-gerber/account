@@ -157,8 +157,105 @@ export interface StockMovement {
   unit_cost: string;
   balance_after: string;
   document_id: string | null;
+  goods_receipt_id: string | null;
   kit_item_id: string | null;
   reason: string;
+  created_at: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  tax_id: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  address_street: string;
+  address_city: string;
+  address_zip: string;
+  notes: string;
+  is_archived: boolean;
+}
+
+export type SupplierInput = Omit<Supplier, "id" | "is_archived" | "email"> & {
+  email: string | null;
+};
+
+export interface SupplierRef {
+  id: string;
+  name: string;
+}
+
+export type OrderStatus = "open" | "partial" | "received" | "cancelled";
+
+export interface OrderLineInput {
+  item_id: string | null;
+  description: string;
+  quantity: string;
+  unit_cost: string;
+}
+
+export interface OrderLine extends OrderLineInput {
+  id: string;
+  received_quantity: string;
+  total: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  number: number;
+  supplier: SupplierRef;
+  status: OrderStatus;
+  order_date: string;
+  expected_date: string | null;
+  notes: string;
+  total: string;
+  lines: OrderLine[];
+  created_at: string;
+}
+
+export interface ReceiptLineInput {
+  item_id: string;
+  order_line_id: string | null;
+  quantity: string;
+  unit_cost: string;
+}
+
+export interface ReceiptLine extends ReceiptLineInput {
+  id: string;
+  description: string;
+  total: string;
+}
+
+export interface GoodsReceipt {
+  id: string;
+  number: number;
+  supplier: SupplierRef;
+  purchase_order_id: string | null;
+  receipt_date: string;
+  supplier_reference: string;
+  notes: string;
+  total: string;
+  lines: ReceiptLine[];
+  created_at: string;
+}
+
+export interface SupplierInvoiceInput {
+  supplier_id: string;
+  purchase_order_id: string | null;
+  invoice_number: string;
+  invoice_date: string;
+  due_date: string | null;
+  net_amount: string;
+  vat_amount: string;
+  paid_date: string | null;
+  notes: string;
+}
+
+export interface SupplierInvoice extends Omit<SupplierInvoiceInput, "supplier_id"> {
+  id: string;
+  supplier: SupplierRef;
+  total: string;
   created_at: string;
 }
 

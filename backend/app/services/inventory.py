@@ -72,6 +72,7 @@ async def move(
     user_id: uuid.UUID | None,
     unit_cost: Decimal | None = None,
     document_id: uuid.UUID | None = None,
+    goods_receipt_id: uuid.UUID | None = None,
     kit_item_id: uuid.UUID | None = None,
     reason: str = "",
 ) -> StockMovement:
@@ -96,6 +97,7 @@ async def move(
         unit_cost=cost,
         balance_after=after,
         document_id=document_id,
+        goods_receipt_id=goods_receipt_id,
         kit_item_id=kit_item_id,
         reason=reason[:300],
         created_by_user_id=user_id,

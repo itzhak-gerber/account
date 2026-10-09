@@ -214,6 +214,8 @@ def export_xlsx(
     lines: Sequence[Sequence[CellValue]],
     payments: Sequence[Sequence[CellValue]],
     stock: Sequence[Sequence[CellValue]] = (),
+    suppliers: Sequence[Sequence[CellValue]] = (),
+    supplier_invoices: Sequence[Sequence[CellValue]] = (),
 ) -> bytes:
     """Everything in one workbook, for a full data export."""
     workbook = Workbook()
@@ -271,5 +273,17 @@ def export_xlsx(
             _sheet(workbook, "מלאי", "מלאי לפי ממוצע משוקלל", business_name),
             ["פריט", "מק״ט", "כמות", "עלות ממוצעת", "שווי", "מינימום"],
             stock,
+        )
+    if suppliers:
+        _table(
+            _sheet(workbook, "ספקים", "ספקים", business_name),
+            ["שם", "מספר עוסק", "איש קשר", "טלפון", "אימייל", "עיר", "בארכיון"],
+            suppliers,
+        )
+    if supplier_invoices:
+        _table(
+            _sheet(workbook, "חשבוניות ספקים", "חשבוניות שהתקבלו מספקים", business_name),
+            ["ספק", "מספר חשבונית", "תאריך", "לתשלום עד", "לפני מע״מ", "מע״מ", "סה״כ", "שולם"],
+            supplier_invoices,
         )
     return _save(workbook)

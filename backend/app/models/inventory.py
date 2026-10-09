@@ -19,7 +19,7 @@ class MovementKind(enum.StrEnum):
     SALE = "sale"  # a tax invoice or invoice-receipt was issued
     RETURN = "return"  # a credit note returned the goods
     ADJUSTMENT = "adjustment"  # a stock count or a manual correction
-    RECEIPT = "receipt"  # goods received (purchasing, next stage)
+    RECEIPT = "receipt"  # goods received from a supplier
 
 
 class StockLevel(Base):
@@ -49,6 +49,7 @@ class StockMovement(IdMixin, Base):
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(14, 4))
     balance_after: Mapped[Decimal] = mapped_column(Numeric(14, 3))
     document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
+    goods_receipt_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("goods_receipts.id"))
     # The kit sold, when this movement is one of its components.
     kit_item_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("items.id"))
     reason: Mapped[str] = mapped_column(String(300), default="")

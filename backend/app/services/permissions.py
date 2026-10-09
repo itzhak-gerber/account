@@ -19,6 +19,9 @@ class Permission(enum.StrEnum):
     EDIT_DRAFTS = "edit_drafts"
     ISSUE_DOCUMENTS = "issue_documents"
     VIEW_REPORTS = "view_reports"
+    # Suppliers, purchase orders, goods receipts and supplier invoices.
+    VIEW_PURCHASING = "view_purchasing"
+    MANAGE_PURCHASING = "manage_purchasing"
     # Download everything (all documents, customers, items): owners, admins and accountants.
     EXPORT_DATA = "export_data"
 
@@ -36,6 +39,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.VIEW_CATALOG,
             Permission.VIEW_DOCUMENTS,
             Permission.VIEW_REPORTS,
+            Permission.VIEW_PURCHASING,
             Permission.EXPORT_DATA,
         }
     ),
@@ -49,6 +53,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.EDIT_DRAFTS,
             Permission.ISSUE_DOCUMENTS,
             Permission.VIEW_REPORTS,
+            Permission.VIEW_PURCHASING,
+            Permission.MANAGE_PURCHASING,
         }
     ),
     Role.VIEWER: frozenset(

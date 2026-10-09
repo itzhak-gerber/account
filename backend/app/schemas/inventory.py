@@ -48,6 +48,7 @@ class MovementOut(BaseModel):
     unit_cost: Decimal
     balance_after: Decimal
     document_id: uuid.UUID | None
+    goods_receipt_id: uuid.UUID | None
     kit_item_id: uuid.UUID | None
     reason: str
     created_at: datetime

@@ -29,6 +29,8 @@ from app.models import (
     DocumentStatus,
     ExportStatus,
     Item,
+    Supplier,
+    SupplierInvoice,
 )
 from app.pdf.render import PAYMENT_LABELS, render_pdf
 from app.reports.excel import export_xlsx
@@ -174,6 +176,18 @@ async def build(session: AsyncSession, export_id: uuid.UUID) -> DataExport:
     )
 
     stock_rows = await inventory_service.stock_rows(session, business.id)
+    suppliers = list(
+        await session.scalars(
+            select(Supplier).where(Supplier.business_id == business.id).order_by(Supplier.name)
+        )
+    )
+    supplier_invoices = list(
+        await session.scalars(
+            select(SupplierInvoice)
+            .where(SupplierInvoice.business_id == business.id)
+            .order_by(SupplierInvoice.invoice_date)
+        )
+    )
 
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -275,6 +289,31 @@ async def build(session: AsyncSession, export_id: uuid.UUID) -> DataExport:
                 stock=[
                     [r.item.name, r.item.sku, r.quantity, r.average_cost, r.value, r.item.min_stock]
                     for r in stock_rows
+                ],
+                suppliers=[
+                    [
+                        s.name,
+                        s.tax_id,
+                        s.contact_name,
+                        s.phone,
+                        s.email,
+                        s.address_city,
+                        "כן" if s.is_archived else "",
+                    ]
+                    for s in suppliers
+                ],
+                supplier_invoices=[
+                    [
+                        i.supplier.name,
+                        i.invoice_number,
+                        i.invoice_date,
+                        i.due_date,
+                        i.net_amount,
+                        i.vat_amount,
+                        i.total,
+                        i.paid_date or "",
+                    ]
+                    for i in supplier_invoices
                 ],
             ),
         )

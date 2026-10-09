@@ -9,6 +9,7 @@ from app.api.v1 import (
     inventory,
     me,
     notifications,
+    purchasing,
     reports,
     system,
 )
@@ -24,3 +25,4 @@ router.include_router(reports.router)
 router.include_router(notifications.router)
 router.include_router(exports.router)
 router.include_router(inventory.router)
+router.include_router(purchasing.router)
