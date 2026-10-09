@@ -51,6 +51,7 @@ class PushTestResult(BaseModel):
     devices: int  # registered for this user
     sent: int  # accepted by the push service
     gone: int  # reported expired and removed: the browser must register again
+    failures: list[int] = []  # other refusals by the push service (HTTP status, 0 = unreachable)
 
 
 class PushConfig(BaseModel):

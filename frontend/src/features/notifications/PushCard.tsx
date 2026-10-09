@@ -51,8 +51,17 @@ export function PushCard() {
 
   useEffect(() => {
     if (!canPush) return;
-    void currentSubscription().then((s) => setSubscribed(s !== null));
-  }, [canPush]);
+    void currentSubscription().then(async (s) => {
+      setSubscribed(s !== null);
+      // Re-send this device's registration: the server may have dropped it (expired, or
+      // turned off from another session) while the browser still holds it.
+      if (s) {
+        const { endpoint, keys } = s.toJSON();
+        await api.put("/me/push", { endpoint, keys }).catch(() => undefined);
+        await queryClient.invalidateQueries({ queryKey: KEY });
+      }
+    });
+  }, [canPush, queryClient]);
 
   const enable = useMutation({
     mutationFn: async () => {
@@ -99,8 +108,11 @@ export function PushCard() {
         setSubscribed(false);
         setNotice(null);
         setProblem(t("push.expired"));
+      } else if (result.devices === 0) {
+        setProblem(t("push.notRegistered"));
       } else {
-        setProblem(t("push.notSent"));
+        const codes = result.failures.join(", ");
+        setProblem(codes ? `${t("push.notSent")} (${codes})` : t("push.notSent"));
       }
       await queryClient.invalidateQueries({ queryKey: KEY });
     },

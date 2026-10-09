@@ -418,6 +418,7 @@ export interface PushTestResult {
   devices: number;
   sent: number;
   gone: number;
+  failures: number[];
 }
 
 export interface PushConfig {

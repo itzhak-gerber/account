@@ -113,4 +113,9 @@ async def push_test(principal: CurrentPrincipal, session: DbSession) -> PushTest
     """Send a test notification to all of this user's devices now, and say what happened."""
     outcome = await push.test(session, principal)
     await commit(session)
-    return PushTestResult(devices=outcome.devices, sent=outcome.sent, gone=len(outcome.gone or []))
+    return PushTestResult(
+        devices=outcome.devices,
+        sent=outcome.sent,
+        gone=len(outcome.gone or []),
+        failures=outcome.failures or [],
+    )

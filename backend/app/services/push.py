@@ -176,11 +176,13 @@ class Outcome:
     sent: int = 0
     # Devices the push service reported as unsubscribed or expired (404/410): to forget.
     gone: list[uuid.UUID] | None = None
+    # Other refusals: the push service's HTTP status (0 = it could not be reached).
+    failures: list[int] | None = None
 
 
 async def send_to(targets: list[Any], data: str) -> Outcome:
     """Deliver ``data`` to rows with id, endpoint, p256dh and auth."""
-    outcome = Outcome(devices=len(targets), gone=[])
+    outcome = Outcome(devices=len(targets), gone=[], failures=[])
     for target in targets:
         if not endpoint_allowed(target.endpoint):
             continue
@@ -194,6 +196,9 @@ async def send_to(targets: list[Any], data: str) -> Outcome:
             outcome.gone.append(target.id)
         elif 200 <= status < 300:
             outcome.sent += 1
+        else:
+            assert outcome.failures is not None
+            outcome.failures.append(status)
     return outcome
 
 
@@ -205,7 +210,7 @@ async def test(session: AsyncSession, principal: Principal) -> Outcome:
         )
     )
     if not enabled():
-        return Outcome(devices=len(targets), gone=[])
+        return Outcome(devices=len(targets), gone=[], failures=[])
     outcome = await send_to(
         targets, payload(title="התראת בדיקה מחשבוניות", link="/profile", tag="test")
     )

@@ -87,16 +87,24 @@ async def test_subscribe_test_and_unsubscribe(
         assert refused.status_code == 400
         assert refused.json()["error"]["code"] == "push_endpoint_not_allowed"
 
-        statuses = iter([201, 410])
+        statuses = iter([201, 403, 410])
         monkeypatch.setattr(push, "send_one", lambda _sub, _data: next(statuses))
         first = await owner.post("/api/v1/me/push/test")
         assert first.status_code == 200, first.text
-        assert first.json() == {"devices": 1, "sent": 1, "gone": 0}
+        assert first.json() == {"devices": 1, "sent": 1, "gone": 0, "failures": []}
+        # Any other refusal is reported with the push service's status, and the device kept.
+        assert (await owner.post("/api/v1/me/push/test")).json() == {
+            "devices": 1,
+            "sent": 0,
+            "gone": 0,
+            "failures": [403],
+        }
         # The push service says this registration expired: it is removed and the UI is told.
         assert (await owner.post("/api/v1/me/push/test")).json() == {
             "devices": 1,
             "sent": 0,
             "gone": 1,
+            "failures": [],
         }
         assert await devices(owner) == 0
         await owner.put("/api/v1/me/push", json={"endpoint": FCM, "keys": KEYS})
@@ -110,7 +118,7 @@ async def test_no_push_without_a_server_key(idp: FakeIdP, sent_jobs: Jobs) -> No
         owner, _bid = await setup(client, idp)
         assert (await owner.get("/api/v1/me/push")).json()["public_key"] is None
         result = await owner.post("/api/v1/me/push/test")
-        assert result.json() == {"devices": 0, "sent": 0, "gone": 0}
+        assert result.json() == {"devices": 0, "sent": 0, "gone": 0, "failures": []}
         assert push_jobs(sent_jobs) == []
 
 
