@@ -4,6 +4,7 @@ from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.catalog import Customer, Item, ItemType, VatType
 from app.models.documents import (
+    DataExport,
     DeliveryStatus,
     Document,
     DocumentDelivery,
@@ -13,6 +14,7 @@ from app.models.documents import (
     DocumentSequence,
     DocumentStatus,
     DocumentType,
+    ExportStatus,
     OutboxEvent,
     PaymentMethod,
     RelationType,
@@ -35,6 +37,7 @@ __all__ = [
     "BusinessMember",
     "BusinessType",
     "Customer",
+    "DataExport",
     "DeliveryStatus",
     "Document",
     "DocumentDelivery",
@@ -44,6 +47,7 @@ __all__ = [
     "DocumentSequence",
     "DocumentStatus",
     "DocumentType",
+    "ExportStatus",
     "Invitation",
     "Item",
     "ItemType",

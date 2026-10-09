@@ -158,6 +158,21 @@ export function fixtureBody(url: string, me: unknown = ME): unknown {
       ],
     ],
     [/^\/me\/push$/, { public_key: "BOrdKG6EE4p7xmFX0MLjIZGDZuxxGM4ZFG2XCxPEcwbW4", devices: 1 }],
+    [
+      /\/exports$/,
+      [
+        {
+          id: "e1",
+          status: "ready",
+          created_at: "2026-10-09T08:00:00Z",
+          finished_at: "2026-10-09T08:01:00Z",
+          expires_at: "2099-10-16T08:01:00Z",
+          size: 2_400_000,
+          documents: 12,
+          downloadable: true,
+        },
+      ],
+    ],
     [/\/document-types$/, TYPES],
     [/\/documents\/numbering$/, { next_numbers: { tax_invoice: 2, receipt: 1 } }],
     [/\/documents\/d1$/, DOCUMENT],

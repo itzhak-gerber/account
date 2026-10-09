@@ -15,13 +15,14 @@ import type { Business, BusinessInput } from "../api/types";
 import { useSession } from "../auth/context";
 import { can } from "../auth/permissions";
 import { AuditTab } from "../features/settings/AuditTab";
+import { ExportTab } from "../features/settings/ExportTab";
 import { BusinessForm } from "../features/settings/BusinessForm";
 import { LogoCard } from "../features/settings/LogoCard";
 import { NumberingTab } from "../features/settings/NumberingTab";
 import { TeamTab } from "../features/settings/TeamTab";
 import { errorMessage } from "../lib/errors";
 
-type TabKey = "details" | "team" | "numbering" | "audit";
+type TabKey = "details" | "team" | "numbering" | "audit" | "export";
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -45,6 +46,7 @@ export function SettingsPage() {
   if (can(role, "viewMembers")) tabs.push("team");
   tabs.push("numbering");
   if (can(role, "viewAudit")) tabs.push("audit");
+  if (can(role, "exportData")) tabs.push("export");
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 960 }}>
@@ -101,6 +103,7 @@ export function SettingsPage() {
         <NumberingTab businessId={business.id} canEdit={can(role, "manageBusiness")} />
       )}
       {tab === "audit" && <AuditTab businessId={business.id} />}
+      {tab === "export" && <ExportTab businessId={business.id} />}
     </Stack>
   );
 }

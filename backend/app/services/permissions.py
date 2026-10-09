@@ -19,6 +19,8 @@ class Permission(enum.StrEnum):
     EDIT_DRAFTS = "edit_drafts"
     ISSUE_DOCUMENTS = "issue_documents"
     VIEW_REPORTS = "view_reports"
+    # Download everything (all documents, customers, items): owners, admins and accountants.
+    EXPORT_DATA = "export_data"
 
 
 _ALL = frozenset(Permission)
@@ -34,6 +36,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.VIEW_CATALOG,
             Permission.VIEW_DOCUMENTS,
             Permission.VIEW_REPORTS,
+            Permission.EXPORT_DATA,
         }
     ),
     Role.MEMBER: frozenset(

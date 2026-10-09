@@ -254,3 +254,26 @@ class DocumentDelivery(IdMixin, Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ExportStatus(enum.StrEnum):
+    PENDING = "pending"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class DataExport(IdMixin, Base):
+    """A full export of one business's data (documents as PDF copies, spreadsheets, and the
+    tax authority's uniform-format file), built in the background as one ZIP file."""
+
+    __tablename__ = "data_exports"
+
+    business_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("businesses.id"), index=True)
+    requested_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[ExportStatus] = mapped_column(String(10), default=ExportStatus.PENDING)
+    storage_key: Mapped[str | None] = mapped_column(String(500))
+    size: Mapped[int | None] = mapped_column(Integer)
+    documents: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

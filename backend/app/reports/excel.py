@@ -204,3 +204,65 @@ def open_balances_xlsx(report: OpenBalancesReport, business_name: str) -> bytes:
         ],
     )
     return _save(workbook)
+
+
+def export_xlsx(
+    business_name: str,
+    customers: Sequence[Sequence[CellValue]],
+    items: Sequence[Sequence[CellValue]],
+    documents: Sequence[Sequence[CellValue]],
+    lines: Sequence[Sequence[CellValue]],
+    payments: Sequence[Sequence[CellValue]],
+) -> bytes:
+    """Everything in one workbook, for a full data export."""
+    workbook = Workbook()
+    _table(
+        _sheet(workbook, "מסמכים", "מסמכים שהופקו", business_name),
+        [
+            "סוג מסמך",
+            "מספר",
+            "תאריך",
+            "לקוח",
+            "מספר עוסק",
+            "לפני מע״מ",
+            "מע״מ",
+            "סה״כ",
+            "שולם",
+            "זוכה",
+            "מספר הקצאה",
+            "הערות",
+        ],
+        documents,
+    )
+    _table(
+        _sheet(workbook, "שורות", "שורות המסמכים", business_name),
+        [
+            "סוג מסמך",
+            "מספר",
+            "שורה",
+            "תיאור",
+            "כמות",
+            "יחידה",
+            "מחיר ליחידה",
+            "הנחה %",
+            "מע״מ",
+            "סה״כ שורה",
+        ],
+        lines,
+    )
+    _table(
+        _sheet(workbook, "תקבולים", "אמצעי תשלום בקבלות", business_name),
+        ["סוג מסמך", "מספר", "אמצעי תשלום", "תאריך", "סכום", "פרטים"],
+        payments,
+    )
+    _table(
+        _sheet(workbook, "לקוחות", "לקוחות", business_name),
+        ["שם", "מספר עוסק / ת״ז", "דוא״ל", "טלפון", "רחוב", "עיר", "מיקוד", "הערות", "בארכיון"],
+        customers,
+    )
+    _table(
+        _sheet(workbook, "פריטים", "פריטים ושירותים", business_name),
+        ["שם", "תיאור", "סוג", "מק״ט", "ברקוד", "יחידה", "מחיר", "מע״מ", "בארכיון"],
+        items,
+    )
+    return _save(workbook)

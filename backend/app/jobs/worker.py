@@ -17,8 +17,15 @@ from sqlalchemy import text, update
 
 from app.core.config import get_settings
 from app.core.db import commit, get_sessionmaker, set_rls_context
-from app.models import DeliveryStatus, Document, DocumentDelivery, OutboxEvent
-from app.services import events, notifications, push
+from app.models import (
+    DataExport,
+    DeliveryStatus,
+    Document,
+    DocumentDelivery,
+    ExportStatus,
+    OutboxEvent,
+)
+from app.services import events, exports, notifications, push
 from app.services.documents import today
 
 log = structlog.get_logger()
@@ -76,6 +83,27 @@ async def send_push(
         await commit(session)
     log.info("push.sent", devices=outcome.sent, of=outcome.devices, gone=len(outcome.gone or []))
     return outcome.sent
+
+
+async def build_export(ctx: dict[str, Any], *, export_id: str, business_id: str) -> str:
+    """Build a full data export (see services/exports.py); a failure is recorded on the row."""
+    async with get_sessionmaker()() as session:
+        await set_rls_context(session, business_id=uuid.UUID(business_id))
+        try:
+            export = await exports.build(session, uuid.UUID(export_id))
+            await commit(session)
+            log.info("export.ready", export_id=export_id, documents=export.documents)
+            return "ready"
+        except Exception as exc:
+            await session.rollback()
+            log.exception("export.failed", export_id=export_id)
+            failed = await session.get(DataExport, uuid.UUID(export_id))
+            if failed is not None:
+                failed.status = ExportStatus.FAILED
+                failed.error = str(exc)[:500]
+                failed.finished_at = datetime.now(UTC)
+                await commit(session)
+            return "failed"
 
 
 async def _record(
@@ -260,6 +288,8 @@ class WorkerSettings:
         send_email,
         send_document_email,
         func(send_push, max_tries=1),
+        # One PDF per document: allow long exports, and do not retry a failed one.
+        func(build_export, timeout=3600, max_tries=1),
         # No stored result, so the next "kick" with the same job id is accepted right away.
         func(dispatch_outbox, name=events.DISPATCH_JOB, keep_result=0),
         raise_overdue_events,

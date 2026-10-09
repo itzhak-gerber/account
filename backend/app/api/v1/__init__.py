@@ -4,6 +4,7 @@ from app.api.v1 import (
     businesses,
     catalog,
     documents,
+    exports,
     files,
     me,
     notifications,
@@ -20,3 +21,4 @@ router.include_router(documents.router)
 router.include_router(files.router)
 router.include_router(reports.router)
 router.include_router(notifications.router)
+router.include_router(exports.router)

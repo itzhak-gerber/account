@@ -60,6 +60,17 @@ export interface InvitationPreview {
   status: "pending" | "expired" | "accepted" | "revoked";
 }
 
+export interface DataExport {
+  id: string;
+  status: "pending" | "ready" | "failed";
+  created_at: string;
+  finished_at: string | null;
+  expires_at: string | null;
+  size: number | null;
+  documents: number | null;
+  downloadable: boolean;
+}
+
 export interface AuditEntry {
   id: string;
   actor_email: string | null;

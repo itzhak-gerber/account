@@ -13,7 +13,8 @@ export function can(
     | "viewAudit"
     | "manageCatalog"
     | "editDocuments"
-    | "viewReports",
+    | "viewReports"
+    | "exportData",
 ): boolean {
   if (!role) return false;
   switch (action) {
@@ -30,6 +31,7 @@ export function can(
     case "viewReports":
       return role !== "viewer";
     case "viewAudit":
+    case "exportData":
       return role === "owner" || role === "admin" || role === "accountant";
   }
 }
