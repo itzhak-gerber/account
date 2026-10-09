@@ -39,6 +39,8 @@
   .totals td { border: none; padding: 1.2mm 2mm; }
   .totals tr.grand td { border-top: 2px solid #111827; font-weight: 700; font-size: 12pt; }
   .notes { white-space: pre-wrap; margin-top: 4mm; }
+  .signature { margin-top: 12mm; display: flex; gap: 8mm; }
+  .signature div { flex: 1; border-top: 1px solid #555; padding-top: 1.5mm; font-size: 9pt; }
   .reference { margin-bottom: 4mm; font-weight: 700; }
   .watermark { position: fixed; top: 110mm; right: 0; left: 0; text-align: center;
                font-size: 70pt; color: rgba(185, 28, 28, 0.12); transform: rotate(-30deg); }
@@ -126,5 +128,6 @@
 
 {% if not shows_vat and exempt_note %}<div>{{ exempt_note }}</div>{% endif %}
 {% if doc.notes %}<div class="notes"><strong>הערות:</strong> {{ doc.notes }}</div>{% endif %}
+{% if receiver_signature %}<div class="signature"><div>שם המקבל</div><div>חתימה</div><div>תאריך קבלה</div></div>{% endif %}
 </body>
 </html>

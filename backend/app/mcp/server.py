@@ -196,11 +196,13 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
         status: DocumentStatus | None = None,
         query: str | None = None,
         unpaid_only: bool = False,
+        uninvoiced_delivery_notes: bool = False,
         limit: int = 20,
     ) -> list[DocumentSummary]:
         """List documents, newest first. query matches the customer name or document number.
 
         unpaid_only: issued tax invoices/proformas with an open balance (balance_due).
+        uninvoiced_delivery_notes: issued delivery notes no invoice has billed yet.
         """
         async with _business_session(business_id) as (session, ctx):
             return await documents.list_documents(
@@ -210,6 +212,7 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
                 status=status,
                 q=query,
                 open_only=unpaid_only,
+                uninvoiced=uninvoiced_delivery_notes,
                 limit=min(limit, 100),
             )
 
@@ -222,7 +225,8 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
 
     @mcp.tool()
     async def create_document_draft(business_id: uuid.UUID, document: DocumentIn) -> DocumentOut:
-        """Create a DRAFT quote, proforma, tax invoice, receipt or tax invoice-receipt.
+        """Create a DRAFT quote, proforma, tax invoice, receipt, tax invoice-receipt or delivery
+        note (תעודת משלוח: goods delivered before the invoice; prices optional).
 
         Prices are before VAT unless prices_include_vat is true; VAT and totals are computed.
         Receipts have payments instead of lines, and can list the invoices they pay in
@@ -272,9 +276,25 @@ def build_mcp_server(*, with_auth: bool = True) -> MCPServer:
     async def convert_document(
         business_id: uuid.UUID, document_id: uuid.UUID, target_type: DocumentType
     ) -> DocumentOut:
-        """Create a DRAFT from an issued quote/proforma (e.g. quote → tax_invoice)."""
+        """Create a DRAFT from an issued quote, proforma or delivery note (e.g. quote →
+        tax_invoice). Goods on a delivery note left stock already; the invoice does not take
+        them out again."""
         async with _business_session(business_id) as (session, ctx):
             doc = await documents.convert(session, ctx, document_id, target_type)
+            return await documents.to_out(session, doc)
+
+    @mcp.tool()
+    async def invoice_delivery_notes(
+        business_id: uuid.UUID,
+        delivery_note_ids: list[uuid.UUID],
+        target_type: DocumentType = DocumentType.TAX_INVOICE,
+    ) -> DocumentOut:
+        """Create one DRAFT invoice billing several issued delivery notes of the same customer
+        (חשבונית מרכזת). Find them with search_documents uninvoiced_delivery_notes=true."""
+        async with _business_session(business_id) as (session, ctx):
+            doc = await documents.invoice_delivery_notes(
+                session, ctx, delivery_note_ids, target_type
+            )
             return await documents.to_out(session, doc)
 
     @mcp.tool()

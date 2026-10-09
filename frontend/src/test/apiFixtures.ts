@@ -217,8 +217,22 @@ const SUMMARY = {
   total: "708.00",
   payment_status: "unpaid",
   balance_due: "708.00",
+  delivery_status: null,
   created_at: "2026-10-05T10:00:00Z",
 };
+const DELIVERY_NOTES = [3, 4].map((number) => ({
+  id: `dn${number}`,
+  type: "delivery_note",
+  status: "issued",
+  number,
+  issue_date: `2026-10-0${number}`,
+  customer_name: CUSTOMER.name,
+  total: "0.00",
+  payment_status: null,
+  balance_due: null,
+  delivery_status: "open",
+  created_at: `2026-10-0${number}T10:00:00Z`,
+}));
 const DOCUMENT = {
   ...SUMMARY,
   title: "חשבונית מס",
@@ -277,6 +291,7 @@ const AGING = {
 
 /** The JSON body the API would return for `url` (lists default to empty). */
 export function fixtureBody(url: string, me: unknown = ME): unknown {
+  if (url.includes("uninvoiced=true")) return DELIVERY_NOTES;
   const path = url.replace(/^\/api\/v1/, "").split("?")[0];
   const routes: [RegExp, unknown][] = [
     [/^\/me$/, me],
@@ -319,7 +334,7 @@ export function fixtureBody(url: string, me: unknown = ME): unknown {
     [/\/document-types$/, TYPES],
     [/\/documents\/numbering$/, { next_numbers: { tax_invoice: 2, receipt: 1 } }],
     [/\/documents\/d1$/, DOCUMENT],
-    [/\/documents$/, [SUMMARY]],
+    [/\/documents$/, [SUMMARY, ...DELIVERY_NOTES]],
     [/\/customers$/, [CUSTOMER]],
     [/\/items$/, [ITEM, PRODUCT, KIT]],
     [/\/inventory\/[^/]+\/movements$/, MOVEMENTS],

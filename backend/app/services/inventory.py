@@ -1,8 +1,10 @@
 """Stock of tracked products: levels, the movement ledger, weighted average cost, counts,
 low-stock alerts, and the stock effect of issued documents.
 
-- Tax invoices and invoice-receipts take goods out; credit notes bring them back (unless the
-  credit is for price only). A sales kit moves its components.
+- Tax invoices, invoice-receipts and delivery notes take goods out; credit notes bring them
+  back (unless the credit is for price only). A sales kit moves its components.
+- An invoice that bills delivery notes takes out only what goes beyond what those notes
+  already delivered (normally nothing).
 - Selling below zero is allowed (invoicing must never get stuck); the editor warns first.
 - Valuation: weighted moving average. Goods in at a cost update the average; goods out leave
   at the current average, recorded on the movement.
@@ -22,10 +24,12 @@ from app.auth.principal import BusinessContext
 from app.core.errors import AppError, NotFound
 from app.models import (
     Document,
+    DocumentRelation,
     DocumentType,
     Item,
     ItemType,
     MovementKind,
+    RelationType,
     StockLevel,
     StockMovement,
 )
@@ -33,7 +37,10 @@ from app.services import audit, events
 from app.services.permissions import Permission, require
 
 ZERO = Decimal("0")
-OUT_DOCUMENTS = frozenset({DocumentType.TAX_INVOICE, DocumentType.TAX_INVOICE_RECEIPT})
+OUT_DOCUMENTS = frozenset(
+    {DocumentType.TAX_INVOICE, DocumentType.TAX_INVOICE_RECEIPT, DocumentType.DELIVERY_NOTE}
+)
+Key = tuple[uuid.UUID, uuid.UUID | None]  # (product, kit it was sold in)
 
 
 class InvalidStock(AppError):
@@ -119,6 +126,47 @@ async def move(
     return movement
 
 
+async def _quantities(
+    session: AsyncSession, ctx: BusinessContext, documents: list[Document]
+) -> dict[Key, Decimal]:
+    """Stock quantities on these documents' lines, kits broken into their components."""
+    ids = {line.item_id for d in documents for line in d.lines if line.item_id}
+    if not ids:
+        return {}
+    items = {
+        i.id: i
+        for i in await session.scalars(
+            select(Item).where(Item.business_id == ctx.business_id, Item.id.in_(ids))
+        )
+    }
+    # (product, kit) -> quantity, so a product sold alone and inside a kit stay distinct.
+    totals: dict[Key, Decimal] = defaultdict(lambda: ZERO)
+    for line in (line for d in documents for line in d.lines):
+        item = items.get(line.item_id) if line.item_id else None
+        if item is None:
+            continue
+        if item.item_type == ItemType.KIT:
+            for component in item.components:
+                totals[(component.component_item_id, item.id)] += component.quantity * line.quantity
+        elif item.track_inventory:
+            totals[(item.id, None)] += line.quantity
+    return dict(totals)
+
+
+async def _billed_delivery_notes(session: AsyncSession, invoice: Document) -> list[Document]:
+    return list(
+        await session.scalars(
+            select(Document)
+            .join(DocumentRelation, DocumentRelation.to_document_id == Document.id)
+            .where(
+                DocumentRelation.from_document_id == invoice.id,
+                DocumentRelation.relation == RelationType.CONVERTED_FROM,
+                Document.type == DocumentType.DELIVERY_NOTE,
+            )
+        )
+    )
+
+
 async def apply_document(
     session: AsyncSession, ctx: BusinessContext, document: Document
 ) -> list[StockMovement]:
@@ -129,26 +177,11 @@ async def apply_document(
         sign, kind = Decimal(1), MovementKind.RETURN
     else:
         return []
-    ids = {line.item_id for line in document.lines if line.item_id}
-    if not ids:
-        return []
-    items = {
-        i.id: i
-        for i in await session.scalars(
-            select(Item).where(Item.business_id == ctx.business_id, Item.id.in_(ids))
-        )
-    }
-    # (product, kit) -> quantity, so a product sold alone and inside a kit stay distinct.
-    totals: dict[tuple[uuid.UUID, uuid.UUID | None], Decimal] = defaultdict(lambda: ZERO)
-    for line in document.lines:
-        item = items.get(line.item_id) if line.item_id else None
-        if item is None:
-            continue
-        if item.item_type == ItemType.KIT:
-            for component in item.components:
-                totals[(component.component_item_id, item.id)] += component.quantity * line.quantity
-        elif item.track_inventory:
-            totals[(item.id, None)] += line.quantity
+    totals = await _quantities(session, ctx, [document])
+    if document.type != DocumentType.DELIVERY_NOTE and sign < 0:
+        delivered = await _quantities(session, ctx, await _billed_delivery_notes(session, document))
+        totals = {k: q - delivered.get(k, ZERO) for k, q in totals.items()}
+        totals = {k: q for k, q in totals.items() if q > ZERO}
     if not totals:
         return []
     parts = {

@@ -32,12 +32,14 @@ import { can } from "../../auth/permissions";
 import { errorMessage } from "../../lib/errors";
 import { formatDate, formatMoney } from "../../lib/money";
 import { pdfUrl } from "./hooks";
+import { DeliveryChip } from "./DeliveryChip";
 import { PaymentChip } from "./PaymentChip";
 import { SendEmailDialog } from "./SendEmailDialog";
 
 const CONVERSIONS: Partial<Record<DocumentType, DocumentType[]>> = {
   quote: ["tax_invoice", "tax_invoice_receipt", "proforma_invoice"],
   proforma_invoice: ["tax_invoice", "tax_invoice_receipt"],
+  delivery_note: ["tax_invoice", "tax_invoice_receipt"],
 };
 
 export function DocumentView({ businessId, doc }: { businessId: string; doc: InvoiceDocument }) {
@@ -76,9 +78,9 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
     refreshSoon();
   };
 
-  const conversions = (CONVERSIONS[doc.type] ?? []).filter(
-    (target) => vatRegistered || !["tax_invoice", "tax_invoice_receipt"].includes(target),
-  );
+  const conversions = (
+    doc.delivery_status === "invoiced" ? [] : (CONVERSIONS[doc.type] ?? [])
+  ).filter((target) => vatRegistered || !["tax_invoice", "tax_invoice_receipt"].includes(target));
   const showVat = Number(doc.vat_rate) > 0;
 
   return (
@@ -89,6 +91,7 @@ export function DocumentView({ businessId, doc }: { businessId: string; doc: Inv
         </Typography>
         <Chip color="success" variant="outlined" label={t("docStatus.issued")} />
         {doc.payment_status && <PaymentChip status={doc.payment_status} />}
+        {doc.delivery_status && <DeliveryChip status={doc.delivery_status} />}
       </Stack>
       {derive.isError && <Alert severity="error">{errorMessage(t, derive.error)}</Alert>}
 

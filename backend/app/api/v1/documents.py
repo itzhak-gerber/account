@@ -19,6 +19,7 @@ from app.schemas.documents import (
     DocumentTypeInfo,
     EmailDefaults,
     EmailRequest,
+    InvoiceDeliveryNotesIn,
     NumberingIn,
     NumberingOut,
 )
@@ -58,6 +59,7 @@ async def list_documents(
     date_from: date | None = None,
     date_to: date | None = None,
     open_only: bool = False,
+    uninvoiced: bool = False,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[DocumentSummary]:
@@ -71,6 +73,7 @@ async def list_documents(
         date_from=date_from,
         date_to=date_to,
         open_only=open_only,
+        uninvoiced=uninvoiced,
         limit=limit,
         offset=offset,
     )
@@ -120,6 +123,19 @@ async def convert(
     ctx: CurrentBusiness, document_id: uuid.UUID, data: ConvertIn, session: DbSession
 ) -> DocumentOut:
     document = await documents.convert(session, ctx, document_id, data.type)
+    out = await documents.to_out(session, document)
+    await commit(session)
+    return out
+
+
+@router.post("/documents/invoice-delivery-notes", status_code=201)
+async def invoice_delivery_notes(
+    ctx: CurrentBusiness, data: InvoiceDeliveryNotesIn, session: DbSession
+) -> DocumentOut:
+    """A draft invoice billing one or more delivery notes of the same customer."""
+    document = await documents.invoice_delivery_notes(
+        session, ctx, data.delivery_note_ids, data.type
+    )
     out = await documents.to_out(session, document)
     await commit(session)
     return out

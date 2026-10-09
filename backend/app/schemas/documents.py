@@ -10,6 +10,8 @@ from app.schemas.catalog import OptionalTaxId, Text20, Text30, Text100, Text200,
 
 # superseded: a proforma replaced by the tax invoice issued from it.
 PaymentStatus = Literal["unpaid", "partial", "paid", "superseded"]
+# Delivery notes: "invoiced" once an issued invoice bills them.
+DeliveryNoteStatus = Literal["open", "invoiced"]
 Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
 PositiveMoney = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)]
 Quantity = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=3)]
@@ -161,6 +163,7 @@ class DocumentOut(BaseModel):
     allocation_number: str | None
     # Invoices only: what is paid, credited and still open.
     payment_status: PaymentStatus | None
+    delivery_status: DeliveryNoteStatus | None
     amount_paid: Decimal
     amount_credited: Decimal
     balance_due: Decimal | None
@@ -185,11 +188,17 @@ class DocumentSummary(BaseModel):
     total: Decimal
     payment_status: PaymentStatus | None = None
     balance_due: Decimal | None = None
+    delivery_status: DeliveryNoteStatus | None = None
     created_at: datetime
 
 
 class ConvertIn(BaseModel):
     type: DocumentType
+
+
+class InvoiceDeliveryNotesIn(BaseModel):
+    delivery_note_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+    type: DocumentType = DocumentType.TAX_INVOICE
 
 
 class NumberingOut(BaseModel):

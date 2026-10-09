@@ -399,8 +399,21 @@ sales kits one level deep.
 Later, if needed: price differences between invoice and receipt (landed cost), supplier
 returns, attaching a scan of the supplier invoice, input-VAT (מע״מ תשומות) in the VAT report.
 
-**Stage C: delivery note (תעודת משלוח)** for goods delivered before the invoice, and possibly a
-return note; the invoice made from a delivery note does not take stock out twice.
+**Stage C ✅ (delivery notes, תעודת משלוח):**
+
+- A new document type for goods delivered before the invoice. Not a tax document (any business
+  may issue it), numbered in its own series, prices optional (a zero total is allowed), and
+  its PDF has "received by / signature / date" lines. Issuing it takes the goods out of stock.
+- Invoice from one delivery note (convert), or a consolidated invoice (חשבונית מרכזת) from
+  several open notes of the same customer: Documents → "תעודות משלוח פתוחות" →
+  "חשבונית מרכזת". The draft has every note's lines (by note date) and refers to each note.
+- The invoice takes out of stock only what goes beyond what its notes delivered (normally
+  nothing). Issuing it marks the notes "invoiced" (`superseded_by_id`); a note can never be
+  billed by two issued invoices (checked under a row lock at issue).
+- Delivery notes show "טרם חויבה" / "חויבה בחשבונית" in the lists. MCP: search for open notes
+  and `invoice_delivery_notes`.
+- Goods returned after a delivery note but before the invoice: bill only what was kept and
+  record the return with a stock adjustment (a return note type can be added if needed).
 
 Later if needed: multiple warehouses and transfers.
 
@@ -478,7 +491,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M3** ✅ | Documents core | All six document types, drafts, line items, VAT calculation, gapless numbering, issue flow, immutability trigger, quote → invoice conversion, credit notes, Hebrew PDF (original/copy), outbox events |
 | **M4** | Payments and delivery | ✅ receipts applied to invoices + payment status, signed PDF links, documents emailed to customers (PDF attached, logo inline, retries, delivery history) |
 | **M5** | Notifications | ✅ in-app inbox (bell), email notifications, preferences screen, MCP tools, outbox dispatcher, daily overdue check; new-device sign-in alerts, daily summary email; phone/desktop push (installable PWA + Web Push with VAPID; per-event "on the phone" channel; only the title is pushed, never amounts or names; endpoints limited to the browsers' push services) |
-| **M6** | Israeli compliance | ✅ full data export (Settings → ייצוא נתונים: ZIP with a PDF copy of every issued document, an Excel workbook of documents/lines/payments/customers/items, README; built in the background, downloadable for 7 days, owners/admins/accountants, audited). Inventory stages A (stock, kits) and B (purchasing) done (§10); next delivery notes (stage C), then OPENFRMT 1.31 (spec in docs/) added to the same ZIP; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
+| **M6** | Israeli compliance | ✅ full data export (Settings → ייצוא נתונים: ZIP with a PDF copy of every issued document, an Excel workbook of documents/lines/payments/customers/items, README; built in the background, downloadable for 7 days, owners/admins/accountants, audited). Inventory stages A (stock, kits), B (purchasing) and C (delivery notes, consolidated invoices) done (§10); next OPENFRMT 1.31 (spec in docs/) added to the same ZIP; ITA allocation-number integration behind a feature flag (enabled once the software is registered) |
 | **M7** | Reports and dashboard | ✅ income and VAT per period (taxable / zero-rated / exempt), money received by payment method, open balances with aging, Excel export, dashboard figures and 12-month chart, MCP `get_report` |
 | **M7b** | Accessibility | 🟡 Israeli Standard 5568 (= WCAG 2.0 AA, required by law for services to the public). Done: axe on every screen in unit tests and in Chromium (contrast; desktop and phone) in CI, Keycloak login/registration pages checked, skip link, page titles and focus on navigation, semantic lists/links, keyboard-scrollable tables, accessible chart, AA colour contrast, tagged PDFs (PDF/UA), public accessibility statement page (`/accessibility`). Remaining: accessibility coordinator's contact details for the statement, a manual screen-reader pass (NVDA / VoiceOver / TalkBack) |
 | **M8** | Production hardening | Azure staging + production, observability, backups/restore drill, load test, security review and pen test, privacy policy and terms |
@@ -532,7 +545,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | 1 | First cloud | **Azure** (Israel Central) |
 | 2 | Identity provider | **Keycloak**, self-hosted (free in development; in production only its container + DB cost) |
 | 3 | Product model | **Multi-tenant SaaS** for many businesses |
-| 4 | v1 document types | **All six** |
+| 4 | v1 document types | **All six**, plus delivery notes (תעודת משלוח) with the inventory module |
 | 5 | ITA software registration | **Deferred.** Allocation numbers are built behind a feature flag |
 | 6 | Inventory | Built in stages (§10): one warehouse, weighted-average cost, negative stock allowed with a warning, sales kits one level deep |
 | 7 | Phone notifications | PWA + Web Push first; WhatsApp/SMS later (§9) |

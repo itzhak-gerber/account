@@ -89,7 +89,16 @@ export type BusinessInput = Omit<Business, "id" | "default_currency" | "email" |
 export type VatType = "standard" | "exempt" | "zero";
 export type ItemType = "product" | "service" | "kit";
 export type DocumentType =
-  "quote" | "proforma_invoice" | "tax_invoice" | "receipt" | "tax_invoice_receipt" | "credit_note";
+  | "quote"
+  | "proforma_invoice"
+  | "tax_invoice"
+  | "receipt"
+  | "tax_invoice_receipt"
+  | "credit_note"
+  | "delivery_note";
+
+/** Delivery notes: "invoiced" once an issued invoice bills them. */
+export type DeliveryNoteStatus = "open" | "invoiced";
 export type DocumentStatus = "draft" | "issued";
 export type PaymentMethod =
   "cash" | "check" | "credit_card" | "bank_transfer" | "digital_wallet" | "other";
@@ -355,6 +364,7 @@ export interface InvoiceDocument {
   notes: string;
   allocation_number: string | null;
   payment_status: PaymentStatus | null;
+  delivery_status: DeliveryNoteStatus | null;
   amount_paid: string;
   amount_credited: string;
   balance_due: string | null;
@@ -377,6 +387,7 @@ export interface DocumentSummary {
   customer_name: string;
   total: string;
   payment_status: PaymentStatus | null;
+  delivery_status: DeliveryNoteStatus | null;
   balance_due: string | null;
   created_at: string;
 }

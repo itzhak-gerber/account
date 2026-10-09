@@ -1,4 +1,5 @@
 import SearchIcon from "@mui/icons-material/Search";
+import Button from "@mui/material/Button";
 import InputAdornment from "@mui/material/InputAdornment";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
@@ -13,7 +14,9 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { DocumentStatus, DocumentSummary, DocumentType } from "../api/types";
 import { useSession } from "../auth/context";
+import { can } from "../auth/permissions";
 import { DocumentList } from "../features/documents/DocumentList";
+import { InvoiceDeliveryNotesDialog } from "../features/documents/InvoiceDeliveryNotesDialog";
 import { NewDocumentButton } from "../features/documents/NewDocumentButton";
 import { useDocumentTypes } from "../features/documents/hooks";
 
@@ -23,13 +26,16 @@ export function DocumentsPage() {
   const businessId = current!.business.id;
   const types = useDocumentTypes(businessId);
   const [type, setType] = useState<DocumentType | "">("");
-  const [status, setStatus] = useState<DocumentStatus | "" | "unpaid">("");
+  const [status, setStatus] = useState<DocumentStatus | "" | "unpaid" | "uninvoiced">("");
+  const [consolidating, setConsolidating] = useState(false);
+  const canEdit = can(current?.role, "editDocuments");
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search);
 
   const params = new URLSearchParams({ limit: "100" });
   if (type) params.set("type", type);
   if (status === "unpaid") params.set("open_only", "true");
+  else if (status === "uninvoiced") params.set("uninvoiced", "true");
   else if (status) params.set("status", status);
   if (q) params.set("q", q);
   const documents = useQuery({
@@ -79,15 +85,33 @@ export function DocumentsPage() {
         <ToggleButtonGroup
           exclusive
           value={status}
-          onChange={(_, value: DocumentStatus | "" | "unpaid" | null) => setStatus(value ?? "")}
+          onChange={(_, value: DocumentStatus | "" | "unpaid" | "uninvoiced" | null) =>
+            setStatus(value ?? "")
+          }
           size="small"
         >
           <ToggleButton value="">{t("documents.allStatuses")}</ToggleButton>
           <ToggleButton value="issued">{t("docStatus.issued")}</ToggleButton>
           <ToggleButton value="draft">{t("docStatus.draft")}</ToggleButton>
           <ToggleButton value="unpaid">{t("documents.unpaidOnly")}</ToggleButton>
+          <ToggleButton value="uninvoiced">{t("deliveryNotes.openFilter")}</ToggleButton>
         </ToggleButtonGroup>
       </Stack>
+      {status === "uninvoiced" && canEdit && (
+        <Button
+          variant="outlined"
+          sx={{ alignSelf: "flex-start" }}
+          onClick={() => setConsolidating(true)}
+        >
+          {t("deliveryNotes.consolidate")}
+        </Button>
+      )}
+      {consolidating && (
+        <InvoiceDeliveryNotesDialog
+          businessId={businessId}
+          onClose={() => setConsolidating(false)}
+        />
+      )}
       <DocumentList documents={documents.data} empty={t("documents.empty")} />
     </Stack>
   );

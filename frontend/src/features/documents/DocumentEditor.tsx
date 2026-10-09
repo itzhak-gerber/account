@@ -185,6 +185,13 @@ export function DocumentEditor({ businessId, type, info, document, payInvoice }:
   const [docId, setDocId] = useState<string | null>(document?.id ?? null);
   const [confirmIssue, setConfirmIssue] = useState(false);
   const base = `/businesses/${businessId}/documents`;
+  // Goods on the delivery notes this invoice bills have left stock already.
+  const billsDeliveryNotes = Boolean(
+    document?.related.some(
+      (r) =>
+        r.relation === "converted_from" && r.type === "delivery_note" && r.direction === "outgoing",
+    ),
+  );
 
   const businessType = current!.business.business_type;
   const vatRegistered = businessType === "licensed_dealer" || businessType === "company";
@@ -327,8 +334,12 @@ export function DocumentEditor({ businessId, type, info, document, payInvoice }:
             pricesIncludeVat={state.prices_include_vat && showVat}
             onChange={(lines) => setState((s) => ({ ...s, lines }))}
           />
-          {(type === "tax_invoice" || type === "tax_invoice_receipt") && (
-            <StockWarning businessId={businessId} lines={state.lines} />
+          {["tax_invoice", "tax_invoice_receipt", "delivery_note"].includes(type) &&
+            !billsDeliveryNotes && <StockWarning businessId={businessId} lines={state.lines} />}
+          {billsDeliveryNotes && (
+            <Alert severity="info" sx={{ mt: 1 }}>
+              {t("editor.billsDeliveryNotes")}
+            </Alert>
           )}
           {type === "credit_note" && (
             <FormControlLabel

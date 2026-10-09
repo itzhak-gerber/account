@@ -110,6 +110,7 @@ def _context(
         DocumentType.TAX_INVOICE_RECEIPT: "סה״כ שולם",
         DocumentType.CREDIT_NOTE: "סה״כ זיכוי",
         DocumentType.QUOTE: "סה״כ",
+        DocumentType.DELIVERY_NOTE: "סה״כ",
     }.get(DocumentType(doc.type), "סה״כ לתשלום")
     exempt_note = (
         "העסק פטור מגביית מע״מ"
@@ -141,6 +142,8 @@ def _context(
         "total_label": total_label,
         "exempt_note": exempt_note,
         "references": references,
+        # Delivery notes are signed by whoever receives the goods.
+        "receiver_signature": DocumentType(doc.type) == DocumentType.DELIVERY_NOTE,
         "logo": f"data:image/png;base64,{base64.b64encode(logo).decode()}" if logo else None,
         "footer": "מסמך ממוחשב · הופק באמצעות מערכת חשבוניות",
     }

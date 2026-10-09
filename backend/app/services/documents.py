@@ -33,6 +33,7 @@ from app.schemas.documents import (
     AllocationIn,
     AllocationOut,
     CustomerDetails,
+    DeliveryNoteStatus,
     DeliveryOut,
     DocumentIn,
     DocumentOut,
@@ -48,6 +49,7 @@ from app.schemas.documents import (
 from app.services import audit, branding, catalog, events, inventory, numbering, vat
 from app.services.calc import ZERO, LineInput, compute_totals, money
 from app.services.document_rules import (
+    BILLS_DELIVERY_NOTES,
     CONVERSIONS,
     CREDITABLE,
     RULES,
@@ -251,6 +253,13 @@ def payment_status(document: Document) -> tuple[PaymentStatus | None, Decimal | 
     return "unpaid", money(balance)
 
 
+def delivery_status(document: Document) -> DeliveryNoteStatus | None:
+    """Issued delivery notes: billed by an issued invoice yet, or still open."""
+    if document.type != DocumentType.DELIVERY_NOTE or document.status != DocumentStatus.ISSUED:
+        return None
+    return "open" if document.superseded_by_id is None else "invoiced"
+
+
 async def _set_allocations(
     session: AsyncSession, ctx: BusinessContext, document: Document, allocations: list[AllocationIn]
 ) -> None:
@@ -374,6 +383,7 @@ async def to_out(session: AsyncSession, document: Document) -> DocumentOut:
         notes=document.notes,
         allocation_number=document.allocation_number,
         payment_status=status,
+        delivery_status=delivery_status(document),
         amount_paid=document.amount_paid,
         amount_credited=document.amount_credited,
         balance_due=balance,
@@ -413,6 +423,7 @@ async def list_documents(
     date_from: date | None = None,
     date_to: date | None = None,
     open_only: bool = False,
+    uninvoiced: bool = False,
     limit: int = 50,
     offset: int = 0,
 ) -> list[DocumentSummary]:
@@ -436,6 +447,13 @@ async def list_documents(
             Document.superseded_by_id.is_(None),
             Document.total - Document.amount_paid - Document.amount_credited > 0,
         )
+    if uninvoiced:
+        # Issued delivery notes no invoice has billed yet.
+        query = query.where(
+            Document.status == DocumentStatus.ISSUED,
+            Document.type == DocumentType.DELIVERY_NOTE,
+            Document.superseded_by_id.is_(None),
+        )
     if q:
         text = q.strip()
         condition = Document.customer["name"].astext.ilike(f"%{text.replace('%', '')}%")
@@ -456,6 +474,7 @@ async def list_documents(
             total=d.total,
             payment_status=statuses[d.id][0],
             balance_due=statuses[d.id][1],
+            delivery_status=delivery_status(d),
             created_at=d.created_at,
         )
         for d in documents
@@ -569,21 +588,24 @@ async def delete_draft(session: AsyncSession, ctx: BusinessContext, document_id:
 async def _new_draft_from(
     session: AsyncSession,
     ctx: BusinessContext,
-    source: Document,
+    sources: list[Document],
     target_type: DocumentType,
     relation: RelationType,
 ) -> Document:
+    """A draft copying the first source's customer and every source's lines, linked to each."""
+    first = sources[0]
+    source_lines = [line for source in sources for line in source.lines]
     draft = Document(
         business_id=ctx.business_id,
         type=target_type,
         status=DocumentStatus.DRAFT,
         issue_date=today(),
-        customer_id=source.customer_id,
-        customer=dict(source.customer or {}),
-        currency=source.currency,
-        prices_include_vat=source.prices_include_vat,
-        vat_rate=source.vat_rate if target_type == DocumentType.CREDIT_NOTE else ZERO,
-        notes=source.notes,
+        customer_id=first.customer_id,
+        customer=dict(first.customer or {}),
+        currency=first.currency,
+        prices_include_vat=first.prices_include_vat,
+        vat_rate=first.vat_rate if target_type == DocumentType.CREDIT_NOTE else ZERO,
+        notes=first.notes if len(sources) == 1 else "",
         amount_paid=ZERO,
         amount_credited=ZERO,
         source=ctx.principal.channel,
@@ -591,7 +613,7 @@ async def _new_draft_from(
         lines=[
             DocumentLine(
                 business_id=ctx.business_id,
-                position=line.position,
+                position=position,
                 item_id=line.item_id,
                 description=line.description,
                 quantity=line.quantity,
@@ -601,21 +623,22 @@ async def _new_draft_from(
                 vat_type=line.vat_type,
                 line_total=line.line_total,
             )
-            for line in source.lines
+            for position, line in enumerate(source_lines)
         ],
         payments=[],
     )
     await _recalculate(session, await _business(session, ctx), draft)
     session.add(draft)
     await session.flush()
-    session.add(
-        DocumentRelation(
-            business_id=ctx.business_id,
-            from_document_id=draft.id,
-            to_document_id=source.id,
-            relation=relation,
+    for source in sources:
+        session.add(
+            DocumentRelation(
+                business_id=ctx.business_id,
+                from_document_id=draft.id,
+                to_document_id=source.id,
+                relation=relation,
+            )
         )
-    )
     await session.flush()
     await audit.record(
         session,
@@ -624,7 +647,7 @@ async def _new_draft_from(
         entity_type="document",
         entity_id=draft.id,
         business_id=ctx.business_id,
-        changes={"type": target_type, relation.value: str(source.id)},
+        changes={"type": target_type, relation.value: [str(s.id) for s in sources]},
     )
     return draft
 
@@ -643,7 +666,41 @@ async def convert(
         raise Forbidden(
             "This business type cannot issue this document type", code="document_type_not_allowed"
         )
-    return await _new_draft_from(session, ctx, source, target, RelationType.CONVERTED_FROM)
+    if source.type == DocumentType.DELIVERY_NOTE and source.superseded_by_id is not None:
+        raise Conflict("This delivery note was already invoiced", code="delivery_note_invoiced")
+    return await _new_draft_from(session, ctx, [source], target, RelationType.CONVERTED_FROM)
+
+
+async def invoice_delivery_notes(
+    session: AsyncSession,
+    ctx: BusinessContext,
+    note_ids: list[uuid.UUID],
+    target: DocumentType,
+) -> Document:
+    """A draft invoice billing several delivery notes of one customer (חשבונית מרכזת)."""
+    require(ctx.role, Permission.EDIT_DRAFTS)
+    if target not in BILLS_DELIVERY_NOTES:
+        raise InvalidDocument("This conversion is not supported", code="conversion_not_allowed")
+    business = await _business(session, ctx)
+    if target not in allowed_types(BusinessType(business.business_type)):
+        raise Forbidden(
+            "This business type cannot issue this document type", code="document_type_not_allowed"
+        )
+    notes = [await _load(session, ctx, note_id) for note_id in dict.fromkeys(note_ids)]
+    for note in notes:
+        if note.type != DocumentType.DELIVERY_NOTE or note.status != DocumentStatus.ISSUED:
+            raise InvalidDocument(
+                "Only issued delivery notes can be invoiced", code="not_a_delivery_note"
+            )
+        if note.superseded_by_id is not None:
+            raise Conflict("This delivery note was already invoiced", code="delivery_note_invoiced")
+    customers = {(n.customer_id, (n.customer or {}).get("name", "")) for n in notes}
+    if len(customers) > 1:
+        raise InvalidDocument(
+            "The delivery notes are for different customers", code="delivery_notes_customers"
+        )
+    notes.sort(key=lambda n: (n.issue_date, n.number or 0))
+    return await _new_draft_from(session, ctx, notes, target, RelationType.CONVERTED_FROM)
 
 
 async def create_credit_note(
@@ -656,7 +713,7 @@ async def create_credit_note(
             "Credit notes can only be created for issued tax invoices", code="not_creditable"
         )
     return await _new_draft_from(
-        session, ctx, invoice, DocumentType.CREDIT_NOTE, RelationType.CREDITS
+        session, ctx, [invoice], DocumentType.CREDIT_NOTE, RelationType.CREDITS
     )
 
 
@@ -694,7 +751,8 @@ async def _validate_for_issue(
         raise InvalidDocument("At least one line is required", code="lines_required")
     if rules.has_payments and not document.payments:
         raise InvalidDocument("At least one payment is required", code="payments_required")
-    if document.total <= ZERO:
+    # A delivery note may list goods without prices; every other document is about money.
+    if document.total <= ZERO and doc_type != DocumentType.DELIVERY_NOTE:
         raise InvalidDocument("The total must be positive", code="total_not_positive")
     if rules.payments_equal_total:
         paid = sum((p.amount for p in document.payments), ZERO)
@@ -808,6 +866,30 @@ async def _close_proforma(session: AsyncSession, document: Document) -> None:
         document.amount_paid = min(proforma.amount_paid, document.total)
 
 
+async def _close_delivery_notes(session: AsyncSession, document: Document) -> None:
+    """An invoice billing delivery notes marks them invoiced; a note is never billed twice."""
+    if document.type not in BILLS_DELIVERY_NOTES:
+        return
+    note_ids = await session.scalars(
+        select(DocumentRelation.to_document_id)
+        .join(Document, Document.id == DocumentRelation.to_document_id)
+        .where(
+            DocumentRelation.from_document_id == document.id,
+            DocumentRelation.relation == RelationType.CONVERTED_FROM,
+            Document.type == DocumentType.DELIVERY_NOTE,
+        )
+        .order_by(DocumentRelation.to_document_id)
+    )
+    for note_id in note_ids.all():
+        note = await _lock(session, note_id)
+        if note.superseded_by_id is not None:
+            raise Conflict(
+                f"Delivery note {note.number} was already invoiced",
+                code="delivery_note_invoiced",
+            )
+        note.superseded_by_id = document.id
+
+
 async def _lock(session: AsyncSession, document_id: uuid.UUID) -> Document:
     # populate_existing: re-read after the lock, so a concurrent receipt's update is not lost.
     invoice = await session.scalar(
@@ -845,6 +927,7 @@ async def issue(session: AsyncSession, ctx: BusinessContext, document_id: uuid.U
     await _validate_for_issue(session, business, document)
     await _apply_to_invoices(session, document)
     await _close_proforma(session, document)
+    await _close_delivery_notes(session, document)
 
     document.number = await numbering.next_number(
         session, ctx.business_id, DocumentType(document.type)

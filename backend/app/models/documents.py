@@ -34,6 +34,7 @@ class DocumentType(enum.StrEnum):
     RECEIPT = "receipt"  # קבלה
     TAX_INVOICE_RECEIPT = "tax_invoice_receipt"  # חשבונית מס/קבלה
     CREDIT_NOTE = "credit_note"  # חשבונית מס זיכוי
+    DELIVERY_NOTE = "delivery_note"  # תעודת משלוח: goods delivered before the invoice
 
 
 class DocumentStatus(enum.StrEnum):

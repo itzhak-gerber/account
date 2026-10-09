@@ -11,6 +11,7 @@ import { Link as RouterLink } from "react-router";
 
 import type { DocumentSummary } from "../../api/types";
 import { formatDate, formatMoney } from "../../lib/money";
+import { DeliveryChip } from "./DeliveryChip";
 import { PaymentChip } from "./PaymentChip";
 
 export function DocumentList({
@@ -43,7 +44,9 @@ export function DocumentList({
               />
               <Stack sx={{ alignItems: "flex-end", gap: 0.5 }}>
                 <Typography sx={{ fontWeight: 500 }}>{formatMoney(d.total)}</Typography>
-                {d.payment_status && d.payment_status !== "paid" ? (
+                {d.delivery_status ? (
+                  <DeliveryChip status={d.delivery_status} />
+                ) : d.payment_status && d.payment_status !== "paid" ? (
                   <PaymentChip status={d.payment_status} />
                 ) : (
                   <Chip

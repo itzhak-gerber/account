@@ -29,6 +29,8 @@ RULES: dict[DocumentType, TypeRules] = {
         "חשבונית מס/קבלה", True, True, True, True, payments_equal_total=True
     ),
     DocumentType.CREDIT_NOTE: TypeRules("חשבונית מס זיכוי", True, False, True, True),
+    # Not a tax document: the invoice issued from it later is.
+    DocumentType.DELIVERY_NOTE: TypeRules("תעודת משלוח", True, False, False, True),
 }
 
 # Businesses registered for VAT (עוסק מורשה, חברה). Exempt dealers and nonprofits charge no VAT
@@ -47,7 +49,13 @@ CONVERSIONS: dict[DocumentType, frozenset[DocumentType]] = {
     DocumentType.PROFORMA_INVOICE: frozenset(
         {DocumentType.TAX_INVOICE, DocumentType.TAX_INVOICE_RECEIPT}
     ),
+    DocumentType.DELIVERY_NOTE: frozenset(
+        {DocumentType.TAX_INVOICE, DocumentType.TAX_INVOICE_RECEIPT}
+    ),
 }
+
+# Invoices that can bill delivery notes (one note, or several in a consolidated invoice).
+BILLS_DELIVERY_NOTES = frozenset({DocumentType.TAX_INVOICE, DocumentType.TAX_INVOICE_RECEIPT})
 
 CREDITABLE = frozenset({DocumentType.TAX_INVOICE, DocumentType.TAX_INVOICE_RECEIPT})
 

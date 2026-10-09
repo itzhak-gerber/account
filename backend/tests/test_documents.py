@@ -192,7 +192,7 @@ async def test_exempt_dealer_cannot_issue_tax_invoices_and_charges_no_vat(idp: F
         )
         proforma = await draft(owner, bid, type="proforma_invoice")
 
-        assert types == ["quote", "proforma_invoice", "receipt"]
+        assert types == ["quote", "proforma_invoice", "receipt", "delivery_note"]
         assert invoice.json()["error"]["code"] == "document_type_not_allowed"
         assert (proforma["vat_amount"], proforma["total"]) == ("0.00", "1090.00")
 
