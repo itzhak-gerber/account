@@ -47,6 +47,12 @@ class PushSubscriptionRef(BaseModel):
     endpoint: str = Field(min_length=1, max_length=1000)
 
 
+class PushTestResult(BaseModel):
+    devices: int  # registered for this user
+    sent: int  # accepted by the push service
+    gone: int  # reported expired and removed: the browser must register again
+
+
 class PushConfig(BaseModel):
     # None when push is not configured on this server.
     public_key: str | None

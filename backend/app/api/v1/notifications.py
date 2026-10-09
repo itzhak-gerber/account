@@ -15,6 +15,7 @@ from app.schemas.notifications import (
     PushConfig,
     PushSubscriptionIn,
     PushSubscriptionRef,
+    PushTestResult,
     UnreadCount,
 )
 from app.services import devices, notifications, push
@@ -107,10 +108,9 @@ async def push_unsubscribe(
     await commit(session)
 
 
-@router.post("/me/push/test", status_code=status.HTTP_202_ACCEPTED)
-async def push_test(principal: CurrentPrincipal, session: DbSession) -> None:
-    """Send a test notification to all of this user's devices."""
-    push.queue_push(
-        session, [principal.user_id], title="התראת בדיקה מחשבוניות", link="/profile", tag="test"
-    )
+@router.post("/me/push/test")
+async def push_test(principal: CurrentPrincipal, session: DbSession) -> PushTestResult:
+    """Send a test notification to all of this user's devices now, and say what happened."""
+    outcome = await push.test(session, principal)
     await commit(session)
+    return PushTestResult(devices=outcome.devices, sent=outcome.sent, gone=len(outcome.gone or []))

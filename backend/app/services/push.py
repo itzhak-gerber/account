@@ -8,10 +8,12 @@ lock screens are public, so amounts and customer names stay in the app.
 import base64
 import json
 import uuid
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 from urllib.parse import urlsplit
 
+import anyio
 import structlog
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -159,5 +161,54 @@ def send_one(subscription: dict[str, Any], data: str) -> int:
         return int(getattr(response, "status_code", 201))
     except WebPushException as exc:
         status = exc.response.status_code if exc.response is not None else 0
-        log.warning("push.failed", status=status, error=str(exc)[:200])
+        log.warning(
+            "push.failed",
+            service=urlsplit(subscription["endpoint"]).hostname,
+            status=status,
+            error=str(exc)[:200],
+        )
         return int(status)
+
+
+@dataclass
+class Outcome:
+    devices: int = 0
+    sent: int = 0
+    # Devices the push service reported as unsubscribed or expired (404/410): to forget.
+    gone: list[uuid.UUID] | None = None
+
+
+async def send_to(targets: list[Any], data: str) -> Outcome:
+    """Deliver ``data`` to rows with id, endpoint, p256dh and auth."""
+    outcome = Outcome(devices=len(targets), gone=[])
+    for target in targets:
+        if not endpoint_allowed(target.endpoint):
+            continue
+        subscription = {
+            "endpoint": target.endpoint,
+            "keys": {"p256dh": target.p256dh, "auth": target.auth},
+        }
+        status = await anyio.to_thread.run_sync(send_one, subscription, data)
+        if status in (404, 410):
+            assert outcome.gone is not None
+            outcome.gone.append(target.id)
+        elif 200 <= status < 300:
+            outcome.sent += 1
+    return outcome
+
+
+async def test(session: AsyncSession, principal: Principal) -> Outcome:
+    """Send a test notification to this user's devices now, and report what happened."""
+    targets = list(
+        await session.scalars(
+            select(PushSubscription).where(PushSubscription.user_id == principal.user_id)
+        )
+    )
+    if not enabled():
+        return Outcome(devices=len(targets), gone=[])
+    outcome = await send_to(
+        targets, payload(title="התראת בדיקה מחשבוניות", link="/profile", tag="test")
+    )
+    if outcome.gone:
+        await session.execute(delete(PushSubscription).where(PushSubscription.id.in_(outcome.gone)))
+    return outcome

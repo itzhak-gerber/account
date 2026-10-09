@@ -366,6 +366,12 @@ export interface ChannelPrefs {
   push: boolean;
 }
 
+export interface PushTestResult {
+  devices: number;
+  sent: number;
+  gone: number;
+}
+
 export interface PushConfig {
   public_key: string | null;
   devices: number;

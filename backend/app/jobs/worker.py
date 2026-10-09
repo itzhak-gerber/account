@@ -8,7 +8,6 @@ from typing import Any, ClassVar
 from zoneinfo import ZoneInfo
 
 import aiosmtplib
-import anyio
 import structlog
 from arq import Retry
 from arq.connections import RedisSettings
@@ -71,25 +70,12 @@ async def send_push(
                 {"users": user_ids},
             )
         ).all()
-        data = push.payload(title=title, link=link, tag=tag)
-        sent = 0
-        for target in targets:
-            if not push.endpoint_allowed(target.endpoint):
-                continue
-            subscription = {
-                "endpoint": target.endpoint,
-                "keys": {"p256dh": target.p256dh, "auth": target.auth},
-            }
-            status = await anyio.to_thread.run_sync(push.send_one, subscription, data)
-            if status in (404, 410):
-                await session.execute(
-                    text("SELECT forget_push_subscription(:id)"), {"id": target.id}
-                )
-            elif 200 <= status < 300:
-                sent += 1
+        outcome = await push.send_to(list(targets), push.payload(title=title, link=link, tag=tag))
+        for gone in outcome.gone or []:
+            await session.execute(text("SELECT forget_push_subscription(:id)"), {"id": gone})
         await commit(session)
-    log.info("push.sent", devices=sent, of=len(targets))
-    return sent
+    log.info("push.sent", devices=outcome.sent, of=outcome.devices, gone=len(outcome.gone or []))
+    return outcome.sent
 
 
 async def _record(

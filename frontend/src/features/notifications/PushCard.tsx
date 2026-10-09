@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import type { PushConfig } from "../../api/types";
+import type { PushConfig, PushTestResult } from "../../api/types";
 import { errorMessage } from "../../lib/errors";
 
 const KEY = ["me", "push"];
@@ -46,6 +46,7 @@ export function PushCard() {
   const config = useQuery({ queryKey: KEY, queryFn: () => api.get<PushConfig>("/me/push") });
   const [subscribed, setSubscribed] = useState<boolean | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const canPush = supported() && !iosNeedsHomeScreen();
 
   useEffect(() => {
@@ -58,6 +59,8 @@ export function PushCard() {
       if ((await Notification.requestPermission()) !== "granted") throw new Error("denied");
       const registration = await navigator.serviceWorker.register("/sw.js");
       await navigator.serviceWorker.ready;
+      // Always a fresh registration: an old one may have expired at the push service.
+      await (await registration.pushManager.getSubscription())?.unsubscribe();
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: keyBytes(config.data!.public_key!),
@@ -67,6 +70,7 @@ export function PushCard() {
     },
     onSuccess: async () => {
       setSubscribed(true);
+      setProblem(null);
       setNotice(t("push.enabled"));
       await queryClient.invalidateQueries({ queryKey: KEY });
     },
@@ -85,8 +89,21 @@ export function PushCard() {
     },
   });
   const test = useMutation({
-    mutationFn: () => api.post("/me/push/test"),
-    onSuccess: () => setNotice(t("push.testSent")),
+    mutationFn: () => api.post<PushTestResult>("/me/push/test"),
+    onSuccess: async (result) => {
+      if (result.sent > 0) {
+        setNotice(t("push.testSent"));
+      } else if (result.gone > 0) {
+        // The push service dropped this registration: clear it here too, so "enable" shows.
+        await (await currentSubscription())?.unsubscribe();
+        setSubscribed(false);
+        setNotice(null);
+        setProblem(t("push.expired"));
+      } else {
+        setProblem(t("push.notSent"));
+      }
+      await queryClient.invalidateQueries({ queryKey: KEY });
+    },
   });
 
   const denied = "Notification" in window && Notification.permission === "denied";
@@ -124,6 +141,11 @@ export function PushCard() {
               : errorMessage(t, error)}
           </Alert>
         )}
+        {problem && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {problem}
+          </Alert>
+        )}
         {notice && (
           <Alert severity="success" sx={{ mb: 2 }} role="status">
             {notice}
@@ -133,7 +155,15 @@ export function PushCard() {
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             {subscribed ? (
               <>
-                <Button variant="outlined" disabled={test.isPending} onClick={() => test.mutate()}>
+                <Button
+                  variant="outlined"
+                  disabled={test.isPending}
+                  onClick={() => {
+                    setNotice(null);
+                    setProblem(null);
+                    test.mutate();
+                  }}
+                >
                   {t("push.test")}
                 </Button>
                 <Button color="error" disabled={disable.isPending} onClick={() => disable.mutate()}>
