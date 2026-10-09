@@ -45,7 +45,7 @@ from app.schemas.documents import (
     PaymentStatus,
     RelatedDocument,
 )
-from app.services import audit, branding, catalog, events, numbering, vat
+from app.services import audit, branding, catalog, events, inventory, numbering, vat
 from app.services.calc import ZERO, LineInput, compute_totals, money
 from app.services.document_rules import (
     CONVERSIONS,
@@ -365,6 +365,7 @@ async def to_out(session: AsyncSession, document: Document) -> DocumentOut:
         ),
         currency=document.currency,
         prices_include_vat=document.prices_include_vat,
+        returns_stock=document.returns_stock,
         vat_rate=document.vat_rate,
         subtotal=document.subtotal,
         discount_total=document.discount_total,
@@ -484,6 +485,7 @@ async def create_draft(session: AsyncSession, ctx: BusinessContext, data: Docume
         customer={},
         currency=business.default_currency,
         prices_include_vat=data.prices_include_vat,
+        returns_stock=data.returns_stock,
         vat_rate=ZERO,
         notes=data.notes,
         amount_paid=ZERO,
@@ -531,6 +533,8 @@ async def update_draft(
             await _set_customer(session, ctx, document, patch.customer_id, patch.customer)
     if patch.prices_include_vat is not None:
         document.prices_include_vat = patch.prices_include_vat
+    if patch.returns_stock is not None:
+        document.returns_stock = patch.returns_stock
     if patch.lines is not None:
         await _set_lines(session, ctx, document, patch.lines)
     if patch.payments is not None:
@@ -849,6 +853,7 @@ async def issue(session: AsyncSession, ctx: BusinessContext, document_id: uuid.U
     document.business_snapshot = _business_snapshot(business)
     document.issued_at = datetime.now(UTC)
     document.issued_by_user_id = ctx.principal.user_id
+    await inventory.apply_document(session, ctx, document)
 
     pdf = await render_pdf(
         document,

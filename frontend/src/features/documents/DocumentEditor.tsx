@@ -38,6 +38,7 @@ import { pdfUrl } from "./hooks";
 import { EMPTY_LINE, israelToday, type AllocationRow } from "./helpers";
 import { LinesEditor } from "./LinesEditor";
 import { PaymentsEditor } from "./PaymentsEditor";
+import { StockWarning } from "./StockWarning";
 
 const EMPTY_CUSTOMER: CustomerDetails = {
   name: "",
@@ -55,6 +56,7 @@ interface EditorState {
   customer_id: string | null;
   customer: CustomerDetails;
   prices_include_vat: boolean;
+  returns_stock: boolean;
   lines: LineInput[];
   payments: PaymentInput[];
   allocations: AllocationRow[];
@@ -83,6 +85,7 @@ function stateFrom(
       customer_id: payInvoice.customer_id,
       customer: { ...EMPTY_CUSTOMER, ...payInvoice.customer },
       prices_include_vat: false,
+      returns_stock: true,
       lines: [],
       payments: [
         { method: "bank_transfer", amount: balance, payment_date: israelToday(), details: {} },
@@ -109,6 +112,7 @@ function stateFrom(
       customer_id: null,
       customer: EMPTY_CUSTOMER,
       prices_include_vat: false,
+      returns_stock: true,
       lines: info.has_lines ? [{ ...EMPTY_LINE }] : [],
       payments: [],
       allocations: [],
@@ -121,6 +125,7 @@ function stateFrom(
     customer_id: doc.customer_id,
     customer: { ...EMPTY_CUSTOMER, ...doc.customer },
     prices_include_vat: doc.prices_include_vat,
+    returns_stock: doc.returns_stock,
     lines: doc.lines.map((l) => ({
       item_id: l.item_id,
       description: l.description,
@@ -322,6 +327,21 @@ export function DocumentEditor({ businessId, type, info, document, payInvoice }:
             pricesIncludeVat={state.prices_include_vat && showVat}
             onChange={(lines) => setState((s) => ({ ...s, lines }))}
           />
+          {(type === "tax_invoice" || type === "tax_invoice_receipt") && (
+            <StockWarning businessId={businessId} lines={state.lines} />
+          )}
+          {type === "credit_note" && (
+            <FormControlLabel
+              sx={{ mt: 1 }}
+              control={
+                <Switch
+                  checked={state.returns_stock}
+                  onChange={(e) => setState((s) => ({ ...s, returns_stock: e.target.checked }))}
+                />
+              }
+              label={t("editor.returnsStock")}
+            />
+          )}
         </Box>
       )}
 

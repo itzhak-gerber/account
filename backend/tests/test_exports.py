@@ -54,6 +54,7 @@ async def test_full_export_has_every_document_and_the_data(idp: FakeIdP, sent_jo
         assert "2 מסמכים" in archive.read("README.txt").decode()
 
         workbook = load_workbook(io.BytesIO(archive.read("data.xlsx")))
+        # No stock-tracked products here, so no inventory sheet.
         assert workbook.sheetnames == ["מסמכים", "שורות", "תקבולים", "לקוחות", "פריטים"]
         assert workbook["מסמכים"].max_row == 4 + 2  # header rows + two documents
         assert workbook["תקבולים"].max_row >= 5

@@ -101,6 +101,8 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
+const NO_STOCK = { items: [], kits: [], total_value: "0.00" };
+
 describe("DocumentEditor", () => {
   it("shows live VAT totals and issues after confirmation", async () => {
     const calls: { method: string; url: string; body: unknown }[] = [];
@@ -113,6 +115,7 @@ describe("DocumentEditor", () => {
         if (url === "/api/v1/me") return json(ME);
         if (url.endsWith("/document-types")) return json(TYPES);
         if (url.includes("/customers") || url.includes("/items")) return json([]);
+        if (url.endsWith("/inventory")) return json(NO_STOCK);
         if (method === "POST" && url.endsWith("/documents"))
           return json({ ...issuedDoc("d1"), status: "draft", number: null }, 201);
         if (method === "POST" && url.endsWith("/d1/issue")) return json(issuedDoc("d1"));

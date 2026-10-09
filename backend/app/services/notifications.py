@@ -49,6 +49,7 @@ DEFAULTS: dict[NotificationEvent, dict[str, bool]] = {
     # A summary is an email; in the app the dashboard already shows the same numbers.
     NotificationEvent.DAILY_SUMMARY: {"in_app": False, "email": True, "push": False},
     NotificationEvent.NEW_DEVICE_LOGIN: {"in_app": True, "email": True, "push": True},
+    NotificationEvent.LOW_STOCK: {"in_app": True, "email": False, "push": True},
 }
 
 MANAGERS = frozenset({Role.OWNER, Role.ADMIN})
@@ -60,6 +61,7 @@ EVENT_ROLES: dict[NotificationEvent, frozenset[Role]] = {
     NotificationEvent.EMAIL_FAILED: frozenset(),  # only the person who sent it
     NotificationEvent.DAILY_SUMMARY: MANAGERS | {Role.ACCOUNTANT},
     NotificationEvent.NEW_DEVICE_LOGIN: frozenset(),  # the account holder (see devices.py)
+    NotificationEvent.LOW_STOCK: MANAGERS | {Role.MEMBER},
 }
 
 
@@ -168,6 +170,17 @@ def _from_email_failed(payload: dict[str, Any]) -> Message:
     )
 
 
+def _from_low_stock(event_id: uuid.UUID, payload: dict[str, Any]) -> Message:
+    return Message(
+        event=NotificationEvent.LOW_STOCK,
+        title="מלאי נמוך",
+        body=f"{payload['name']}: נותרו {payload['quantity']} (מינימום {payload['min_stock']})",
+        link="/inventory",
+        dedupe_key=f"event:{event_id}",
+        roles=EVENT_ROLES[NotificationEvent.LOW_STOCK],
+    )
+
+
 def _from_member_joined(event_id: uuid.UUID, payload: dict[str, Any]) -> Message:
     name = payload.get("name") or payload.get("email", "")
     return Message(
@@ -250,6 +263,8 @@ async def message_for(
         return await _from_invoice_overdue(session, payload)
     if event_type == "document.email_failed":
         return _from_email_failed(payload)
+    if event_type == "item.low_stock":
+        return _from_low_stock(event_id, payload)
     if event_type == "member.joined":
         return _from_member_joined(event_id, payload)
     if event_type == "business.daily_summary":

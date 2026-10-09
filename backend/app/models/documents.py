@@ -101,6 +101,8 @@ class Document(IdMixin, TimestampMixin, Base):
     )
     notes: Mapped[str] = mapped_column(Text, default="")
     allocation_number: Mapped[str | None] = mapped_column(String(20))
+    # Credit notes: whether the goods come back into stock (False for a price-only credit).
+    returns_stock: Mapped[bool] = mapped_column(default=True, server_default=text("true"))
     original_pdf_file_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("files.id"))
     original_delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source: Mapped[str] = mapped_column(String(10), default="web")

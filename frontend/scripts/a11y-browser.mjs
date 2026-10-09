@@ -20,6 +20,7 @@ const SCREENS = [
   ["new document", "/documents/new?type=tax_invoice"],
   ["customers", "/customers"],
   ["items", "/items"],
+  ["inventory", "/inventory"],
   ["reports", "/reports"],
   ["notifications", "/notifications"],
   ["settings", "/settings"],

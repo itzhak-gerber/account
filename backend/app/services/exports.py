@@ -33,13 +33,14 @@ from app.models import (
 from app.pdf.render import PAYMENT_LABELS, render_pdf
 from app.reports.excel import export_xlsx
 from app.services import audit, branding
+from app.services import inventory as inventory_service
 from app.services.document_rules import RULES
 from app.services.documents import references_for
 from app.services.permissions import Permission, require
 
 KEEP_FOR = timedelta(days=7)
 VAT_LABELS = {"standard": "חייב", "exempt": "פטור", "zero": "אפס"}
-ITEM_TYPES = {"service": "שירות", "product": "מוצר"}
+ITEM_TYPES = {"service": "שירות", "product": "מוצר", "kit": "ערכה"}
 
 
 def _out(export: DataExport) -> dict[str, Any]:
@@ -172,6 +173,8 @@ async def build(session: AsyncSession, export_id: uuid.UUID) -> DataExport:
         )
     )
 
+    stock_rows = await inventory_service.stock_rows(session, business.id)
+
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         logos: dict[str, bytes | None] = {}
@@ -268,6 +271,10 @@ async def build(session: AsyncSession, export_id: uuid.UUID) -> DataExport:
                     ]
                     for d in documents
                     for p in d.payments
+                ],
+                stock=[
+                    [r.item.name, r.item.sku, r.quantity, r.average_cost, r.value, r.item.min_stock]
+                    for r in stock_rows
                 ],
             ),
         )

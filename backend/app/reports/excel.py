@@ -213,6 +213,7 @@ def export_xlsx(
     documents: Sequence[Sequence[CellValue]],
     lines: Sequence[Sequence[CellValue]],
     payments: Sequence[Sequence[CellValue]],
+    stock: Sequence[Sequence[CellValue]] = (),
 ) -> bytes:
     """Everything in one workbook, for a full data export."""
     workbook = Workbook()
@@ -265,4 +266,10 @@ def export_xlsx(
         ["שם", "תיאור", "סוג", "מק״ט", "ברקוד", "יחידה", "מחיר", "מע״מ", "בארכיון"],
         items,
     )
+    if stock:
+        _table(
+            _sheet(workbook, "מלאי", "מלאי לפי ממוצע משוקלל", business_name),
+            ["פריט", "מק״ט", "כמות", "עלות ממוצעת", "שווי", "מינימום"],
+            stock,
+        )
     return _save(workbook)

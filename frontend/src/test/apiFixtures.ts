@@ -44,7 +44,51 @@ const ITEM = {
   unit_price: "350.00",
   vat_type: "standard",
   is_archived: false,
+  track_inventory: false,
+  min_stock: null,
+  components: [],
 };
+const PRODUCT = {
+  ...ITEM,
+  id: "i2",
+  name: "מקלדת אלחוטית",
+  item_type: "product",
+  sku: "KB-100",
+  unit_of_measure: "יחידה",
+  unit_price: "120.00",
+  track_inventory: true,
+  min_stock: "5.000",
+};
+const KIT = {
+  ...ITEM,
+  id: "i3",
+  name: "ערכת עבודה מהבית",
+  item_type: "kit",
+  sku: "KIT-1",
+  unit_of_measure: "יחידה",
+  unit_price: "450.00",
+  components: [{ item_id: "i2", quantity: "1.000" }],
+};
+const STOCK = {
+  items: [
+    { item: PRODUCT, quantity: "3.000", average_cost: "80.0000", value: "240.00", low: true },
+  ],
+  kits: [{ item: KIT, available: "3" }],
+  total_value: "240.00",
+};
+const MOVEMENTS = [
+  {
+    id: "m1",
+    kind: "adjustment",
+    quantity: "10.000",
+    unit_cost: "80.0000",
+    balance_after: "10.000",
+    document_id: null,
+    kit_item_id: null,
+    reason: "ספירת פתיחה",
+    created_at: "2026-10-01T09:00:00Z",
+  },
+];
 const TYPES = [
   {
     type: "tax_invoice",
@@ -85,6 +129,7 @@ const DOCUMENT = {
   customer: { ...CUSTOMER },
   currency: "ILS",
   prices_include_vat: false,
+  returns_stock: true,
   vat_rate: "0.1800",
   subtotal: "600.00",
   discount_total: "0.00",
@@ -178,7 +223,9 @@ export function fixtureBody(url: string, me: unknown = ME): unknown {
     [/\/documents\/d1$/, DOCUMENT],
     [/\/documents$/, [SUMMARY]],
     [/\/customers$/, [CUSTOMER]],
-    [/\/items$/, [ITEM]],
+    [/\/items$/, [ITEM, PRODUCT, KIT]],
+    [/\/inventory\/[^/]+\/movements$/, MOVEMENTS],
+    [/\/inventory$/, STOCK],
     [
       /\/reports\/dashboard$/,
       {

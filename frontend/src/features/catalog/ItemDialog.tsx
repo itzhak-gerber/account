@@ -4,8 +4,10 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
 import MenuItem from "@mui/material/MenuItem";
+import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
@@ -17,6 +19,7 @@ import { api } from "../../api/client";
 import type { Item, ItemInput } from "../../api/types";
 import { cleanAmount, finishAmount, isAmount } from "../../lib/amount";
 import { errorMessage } from "../../lib/errors";
+import { KitComponentsEditor } from "./KitComponentsEditor";
 
 const EMPTY: ItemInput = {
   name: "",
@@ -27,6 +30,9 @@ const EMPTY: ItemInput = {
   unit_of_measure: "",
   unit_price: "",
   vat_type: "standard",
+  track_inventory: false,
+  min_stock: null,
+  components: [],
 };
 
 interface Props {
@@ -40,7 +46,9 @@ export function ItemDialog({ businessId, item, open, onClose }: Props) {
   const { t } = useTranslation();
   const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
   const queryClient = useQueryClient();
-  const [value, setValue] = useState<ItemInput>(item ? { ...item } : EMPTY);
+  const [value, setValue] = useState<ItemInput>(
+    item ? { ...item, components: item.components.map((c) => ({ ...c })) } : EMPTY,
+  );
   const [touched, setTouched] = useState(false);
   const base = `/businesses/${businessId}/items`;
 
@@ -54,11 +62,26 @@ export function ItemDialog({ businessId, item, open, onClose }: Props) {
   });
 
   const priceOk = isAmount(value.unit_price);
+  const isKit = value.item_type === "kit";
+  const componentsOk =
+    !isKit ||
+    (value.components.length > 0 &&
+      value.components.every((c) => c.item_id && Number(c.quantity) > 0));
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setTouched(true);
-    if (!value.name.trim() || !priceOk) return;
-    save.mutate({ ...value, unit_price: finishAmount(value.unit_price) });
+    if (!value.name.trim() || !priceOk || !componentsOk) return;
+    save.mutate({
+      ...value,
+      unit_price: finishAmount(value.unit_price),
+      min_stock:
+        value.item_type === "product" && value.track_inventory && value.min_stock
+          ? finishAmount(value.min_stock)
+          : null,
+      components: isKit
+        ? value.components.map((c) => ({ ...c, quantity: finishAmount(c.quantity) }))
+        : [],
+    });
   };
   const field = (name: keyof ItemInput, props: Record<string, unknown> = {}) => (
     <TextField
@@ -102,7 +125,7 @@ export function ItemDialog({ businessId, item, open, onClose }: Props) {
             <Grid size={{ xs: 6 }}>
               {field("item_type", {
                 select: true,
-                children: (["service", "product"] as const).map((v) => (
+                children: (["service", "product", "kit"] as const).map((v) => (
                   <MenuItem key={v} value={v}>
                     {t(`items.types.${v}`)}
                   </MenuItem>
@@ -125,6 +148,51 @@ export function ItemDialog({ businessId, item, open, onClose }: Props) {
             <Grid size={{ xs: 6 }}>
               {field("barcode", { slotProps: { htmlInput: { dir: "ltr" } } })}
             </Grid>
+            {value.item_type === "product" && (
+              <>
+                <Grid size={{ xs: 12, sm: 6 }} sx={{ display: "flex", alignItems: "center" }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={value.track_inventory}
+                        onChange={(e) =>
+                          setValue((v) => ({ ...v, track_inventory: e.target.checked }))
+                        }
+                      />
+                    }
+                    label={t("items.track_inventory")}
+                  />
+                </Grid>
+                {value.track_inventory && (
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      label={t("items.min_stock")}
+                      helperText={t("items.minStockHelp")}
+                      value={value.min_stock ?? ""}
+                      onChange={(e) =>
+                        setValue((v) => ({
+                          ...v,
+                          min_stock: cleanAmount(e.target.value, 3) || null,
+                        }))
+                      }
+                      fullWidth
+                      slotProps={{ htmlInput: { dir: "ltr", inputMode: "decimal" } }}
+                    />
+                  </Grid>
+                )}
+              </>
+            )}
+            {isKit && (
+              <Grid size={12}>
+                <KitComponentsEditor
+                  businessId={businessId}
+                  kitId={item?.id ?? null}
+                  components={value.components}
+                  error={touched && !componentsOk}
+                  onChange={(components) => setValue((v) => ({ ...v, components }))}
+                />
+              </Grid>
+            )}
             <Grid size={12}>{field("description", { multiline: true, minRows: 2 })}</Grid>
           </Grid>
         </DialogContent>

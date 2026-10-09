@@ -5,7 +5,7 @@ import uuid
 from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, Numeric, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, IdMixin, TimestampMixin
 
@@ -13,6 +13,9 @@ from app.models.base import Base, IdMixin, TimestampMixin
 class ItemType(enum.StrEnum):
     PRODUCT = "product"
     SERVICE = "service"
+    # A sales kit: sold as one line, made of other items (see ItemComponent). Selling it takes
+    # its components out of stock; the kit itself has no stock.
+    KIT = "kit"
 
 
 class VatType(enum.StrEnum):
@@ -64,6 +67,30 @@ class Item(IdMixin, TimestampMixin, Base):
     # Price before VAT, in the business's currency.
     unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     vat_type: Mapped[VatType] = mapped_column(String(10), default=VatType.STANDARD)
-    # Prepared for the future inventory module (docs/PLAN.md §10); unused until then.
+    # Products only: keep stock levels and movements (services and kits never do).
     track_inventory: Mapped[bool] = mapped_column(default=False)
+    # Alert when stock falls below this (None: no alert).
+    min_stock: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
     is_archived: Mapped[bool] = mapped_column(default=False)
+
+    components: Mapped[list["ItemComponent"]] = relationship(
+        foreign_keys="ItemComponent.kit_item_id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="ItemComponent.position",
+    )
+
+
+class ItemComponent(Base):
+    """One component of a sales kit: ``quantity`` of ``component_item_id`` per kit."""
+
+    __tablename__ = "item_components"
+    __table_args__ = (CheckConstraint("quantity > 0", name="quantity_positive"),)
+
+    kit_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
+    )
+    component_item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("items.id"), primary_key=True)
+    business_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("businesses.id"), index=True)
+    position: Mapped[int] = mapped_column(default=0)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3))

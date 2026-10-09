@@ -18,6 +18,7 @@ class NotificationEvent(enum.StrEnum):
     MEMBER_JOINED = "member_joined"  # an invited user joined the business
     DAILY_SUMMARY = "daily_summary"  # the morning summary of yesterday and open balances
     NEW_DEVICE_LOGIN = "new_device_login"  # the account was signed in from a new device
+    LOW_STOCK = "low_stock"  # a product's stock fell below its minimum
 
 
 class Notification(IdMixin, Base):

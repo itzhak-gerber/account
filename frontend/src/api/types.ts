@@ -87,7 +87,7 @@ export type BusinessInput = Omit<Business, "id" | "default_currency" | "email" |
 };
 
 export type VatType = "standard" | "exempt" | "zero";
-export type ItemType = "product" | "service";
+export type ItemType = "product" | "service" | "kit";
 export type DocumentType =
   "quote" | "proforma_invoice" | "tax_invoice" | "receipt" | "tax_invoice_receipt" | "credit_note";
 export type DocumentStatus = "draft" | "issued";
@@ -122,9 +122,45 @@ export interface Item {
   unit_price: string;
   vat_type: VatType;
   is_archived: boolean;
+  track_inventory: boolean;
+  min_stock: string | null;
+  components: KitComponent[];
+}
+
+export interface KitComponent {
+  item_id: string;
+  quantity: string;
 }
 
 export type ItemInput = Omit<Item, "id" | "is_archived">;
+
+export type MovementKind = "sale" | "return" | "adjustment" | "receipt";
+
+export interface StockItem {
+  item: Item;
+  quantity: string;
+  average_cost: string;
+  value: string;
+  low: boolean;
+}
+
+export interface Stock {
+  items: StockItem[];
+  kits: { item: Item; available: string | null }[];
+  total_value: string;
+}
+
+export interface StockMovement {
+  id: string;
+  kind: MovementKind;
+  quantity: string;
+  unit_cost: string;
+  balance_after: string;
+  document_id: string | null;
+  kit_item_id: string | null;
+  reason: string;
+  created_at: string;
+}
 
 export interface DocumentTypeInfo {
   type: DocumentType;
@@ -213,6 +249,7 @@ export interface InvoiceDocument {
   customer: CustomerDetails;
   currency: string;
   prices_include_vat: boolean;
+  returns_stock: boolean;
   vat_rate: string;
   subtotal: string;
   discount_total: string;

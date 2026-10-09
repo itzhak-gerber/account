@@ -17,7 +17,8 @@
     "profile": "פרופיל ואבטחה",
     "logout": "התנתקות",
     "notifications": "התראות",
-    "accessibility": "הצהרת נגישות"
+    "accessibility": "הצהרת נגישות",
+    "inventory": "מלאי"
   },
   "landing": {
     "title": "הפקת חשבוניות וקבלות לעסק שלכם",
@@ -229,7 +230,14 @@
     "document_not_issued": "רק מסמך שהופק ניתן לשליחה.",
     "invalid_period": "טווח התאריכים אינו תקין (עד חמש שנים, ותאריך ההתחלה לפני הסיום)",
     "export_in_progress": "קובץ ייצוא כבר בהכנה. הוא יופיע כאן כשיהיה מוכן.",
-    "export_not_available": "הקובץ הזה כבר אינו זמין להורדה. אפשר להכין קובץ חדש."
+    "export_not_available": "הקובץ הזה כבר אינו זמין להורדה. אפשר להכין קובץ חדש.",
+    "kit_needs_components": "לערכה צריך להיות לפחות רכיב אחד.",
+    "kit_in_kit": "ערכה לא יכולה להכיל ערכה אחרת, ופריט שנמצא בתוך ערכה לא יכול להפוך לערכה.",
+    "kit_duplicate_component": "כל פריט יכול להופיע פעם אחת בערכה.",
+    "components_need_kit": "רק לערכה יש רכיבים.",
+    "stock_not_tracked": "לפריט הזה אין מעקב מלאי.",
+    "adjustment_no_change": "הכמות לא השתנתה.",
+    "adjustment_needs_quantity": "יש להזין כמות שנספרה או שינוי."
   },
   "common": {
     "comingSoon": "בקרוב",
@@ -274,10 +282,19 @@
     "vat_type": "מע״מ",
     "types": {
       "product": "מוצר",
-      "service": "שירות"
+      "service": "שירות",
+      "kit": "ערכה"
     },
     "save": "שמירה",
-    "archive": "העברה לארכיון"
+    "archive": "העברה לארכיון",
+    "track_inventory": "מעקב מלאי",
+    "min_stock": "מלאי מינימום",
+    "minStockHelp": "התראה כשהמלאי יורד מתחת לכמות הזו (לא חובה)",
+    "components": "רכיבי הערכה",
+    "componentsHelp": "המכירה של ערכה מורידה מהמלאי את הרכיבים שלה. רכיב יכול להיות מוצר או שירות, אבל לא ערכה אחרת.",
+    "component": "רכיב {{n}}",
+    "addComponent": "הוספת רכיב",
+    "removeComponent": "הסרת רכיב {{n}}"
   },
   "vatTypes": {
     "standard": "חייב במע״מ",
@@ -331,6 +348,9 @@
     "customerDetails": "פרטי הלקוח במסמך",
     "saveCustomer": "שמירה כלקוח קבוע",
     "pricesIncludeVat": "המחירים כוללים מע״מ",
+    "returnsStock": "החזרת הפריטים למלאי",
+    "stockShort": "אין מספיק במלאי – אפשר להפיק בכל זאת, והמלאי יירד מתחת לאפס:",
+    "stockShortLine": "{{name}}: נדרש {{needed}}, במלאי {{available}}",
     "lines": "פירוט",
     "description": "תיאור",
     "itemSearch": "פריט או תיאור חופשי",
@@ -603,5 +623,61 @@
       "failed": "נכשל",
       "expired": "פג תוקף"
     }
+  },
+  "inventory": {
+    "title": "מלאי",
+    "products": "מוצרים במלאי",
+    "totalValue": "שווי המלאי",
+    "item": "פריט",
+    "quantity": "כמות",
+    "minimum": "מינימום",
+    "averageCost": "עלות ממוצעת",
+    "value": "שווי",
+    "actions": "פעולות",
+    "low": "מלאי נמוך",
+    "lowAlert": "מלאי נמוך: {{names}}",
+    "empty": "עדיין אין מוצרים עם מעקב מלאי. כדי להתחיל, פתחו מוצר בעמוד הפריטים והפעילו \"מעקב מלאי\".",
+    "toItems": "לעמוד הפריטים",
+    "adjust": "ספירה / תיקון",
+    "history": "תנועות",
+    "kits": "ערכות",
+    "kit": "ערכה",
+    "available": "זמינות (ערכות שלמות)",
+    "kitsHelp": "לערכה אין מלאי משלה: הזמינות מחושבת מהמלאי של הרכיבים.",
+    "adjustTitle": "עדכון מלאי – {{name}}",
+    "onHand": "כמות נוכחית: {{quantity}}",
+    "adjustKind": "סוג העדכון",
+    "modes": {
+      "count": "ספירה",
+      "add": "הוספה",
+      "remove": "הורדה"
+    },
+    "quantityLabel": {
+      "count": "הכמות שנספרה",
+      "add": "כמות להוספה",
+      "remove": "כמות להורדה"
+    },
+    "unitCost": "עלות ליחידה (לא חובה)",
+    "unitCostHelp": "משמשת לחישוב העלות הממוצעת. בלי עלות, הסחורה נכנסת בעלות הממוצעת הנוכחית.",
+    "reason": "סיבה",
+    "reasonExample": "למשל: ספירת סוף שנה, מלאי פתיחה, פגום",
+    "save": "שמירה",
+    "historyOf": "תנועות מלאי – {{name}}",
+    "noMovements": "אין עדיין תנועות.",
+    "when": "מועד",
+    "kind": "סוג",
+    "change": "שינוי",
+    "balance": "יתרה",
+    "cost": "עלות ליחידה",
+    "details": "פרטים",
+    "kinds": {
+      "sale": "מכירה",
+      "return": "החזרה",
+      "adjustment": "עדכון",
+      "receipt": "קבלת סחורה"
+    },
+    "document": "למסמך",
+    "viaKit": "למסמך (בתוך ערכה)",
+    "close": "סגירה"
   }
 }

@@ -81,6 +81,7 @@ class DocumentIn(BaseModel):
     customer_id: uuid.UUID | None = None
     customer: CustomerDetails | None = None
     prices_include_vat: bool = False
+    returns_stock: bool = True  # credit notes: bring the goods back into stock
     lines: Annotated[list[LineIn], Field(max_length=200)] = []
     payments: Annotated[list[PaymentIn], Field(max_length=20)] = []
     allocations: Annotated[list[AllocationIn], Field(max_length=50)] = []
@@ -93,6 +94,7 @@ class DocumentPatch(BaseModel):
     customer_id: uuid.UUID | None = None
     customer: CustomerDetails | None = None
     prices_include_vat: bool | None = None
+    returns_stock: bool | None = None
     lines: Annotated[list[LineIn], Field(max_length=200)] | None = None
     payments: Annotated[list[PaymentIn], Field(max_length=20)] | None = None
     allocations: Annotated[list[AllocationIn], Field(max_length=50)] | None = None
@@ -149,6 +151,7 @@ class DocumentOut(BaseModel):
     customer: CustomerDetails
     currency: str
     prices_include_vat: bool
+    returns_stock: bool
     vat_rate: Decimal
     subtotal: Decimal
     discount_total: Decimal

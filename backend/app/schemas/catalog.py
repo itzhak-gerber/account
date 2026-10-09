@@ -26,6 +26,19 @@ Text100 = Annotated[str, StringConstraints(strip_whitespace=True, max_length=100
 Text200 = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
 Text2000 = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
 Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
+StockQuantity = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=3)]
+PositiveQuantity = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=3)]
+
+
+class ComponentIn(BaseModel):
+    item_id: uuid.UUID
+    quantity: PositiveQuantity
+
+
+class ComponentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    item_id: uuid.UUID = Field(validation_alias="component_item_id")
+    quantity: Decimal
 
 
 class CustomerIn(BaseModel):
@@ -74,6 +87,9 @@ class ItemIn(BaseModel):
     unit_of_measure: Text20 = ""
     unit_price: Money = Decimal("0")
     vat_type: VatType = VatType.STANDARD
+    track_inventory: bool = False
+    min_stock: StockQuantity | None = None
+    components: list[ComponentIn] = Field(default_factory=list, max_length=50)
 
 
 class ItemPatch(BaseModel):
@@ -86,6 +102,9 @@ class ItemPatch(BaseModel):
     unit_price: Money | None = None
     vat_type: VatType | None = None
     is_archived: bool | None = None
+    track_inventory: bool | None = None
+    min_stock: StockQuantity | None = None  # send null to remove the alert
+    components: list[ComponentIn] | None = Field(default=None, max_length=50)
 
 
 class ItemOut(BaseModel):
@@ -100,3 +119,6 @@ class ItemOut(BaseModel):
     unit_price: Decimal
     vat_type: VatType
     is_archived: bool
+    track_inventory: bool
+    min_stock: Decimal | None
+    components: list[ComponentOut]
