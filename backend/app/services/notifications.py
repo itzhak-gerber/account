@@ -34,21 +34,21 @@ from app.models import (
     User,
 )
 from app.schemas.notifications import ChannelPrefs, NotificationOut, PreferenceOut
-from app.services import reports
+from app.services import push, reports
 from app.services.document_rules import RULES
 
 CHANNELS = ("in_app", "email")
 
 # Email is on by default only for what usually needs action.
 DEFAULTS: dict[NotificationEvent, dict[str, bool]] = {
-    NotificationEvent.PAYMENT_RECEIVED: {"in_app": True, "email": False},
-    NotificationEvent.DOCUMENT_ISSUED: {"in_app": True, "email": False},
-    NotificationEvent.INVOICE_OVERDUE: {"in_app": True, "email": True},
-    NotificationEvent.EMAIL_FAILED: {"in_app": True, "email": True},
-    NotificationEvent.MEMBER_JOINED: {"in_app": True, "email": False},
+    NotificationEvent.PAYMENT_RECEIVED: {"in_app": True, "email": False, "push": True},
+    NotificationEvent.DOCUMENT_ISSUED: {"in_app": True, "email": False, "push": False},
+    NotificationEvent.INVOICE_OVERDUE: {"in_app": True, "email": True, "push": True},
+    NotificationEvent.EMAIL_FAILED: {"in_app": True, "email": True, "push": True},
+    NotificationEvent.MEMBER_JOINED: {"in_app": True, "email": False, "push": False},
     # A summary is an email; in the app the dashboard already shows the same numbers.
-    NotificationEvent.DAILY_SUMMARY: {"in_app": False, "email": True},
-    NotificationEvent.NEW_DEVICE_LOGIN: {"in_app": True, "email": True},
+    NotificationEvent.DAILY_SUMMARY: {"in_app": False, "email": True, "push": False},
+    NotificationEvent.NEW_DEVICE_LOGIN: {"in_app": True, "email": True, "push": True},
 }
 
 MANAGERS = frozenset({Role.OWNER, Role.ADMIN})
@@ -319,6 +319,13 @@ async def deliver(session: AsyncSession, business_id: uuid.UUID, message: Messag
             delivered += 1
         except IntegrityError:
             continue
+    push.queue_push(
+        session,
+        [u for u in recipients if prefs[u]["push"]],
+        title=message.title,
+        link=message.link,
+        tag=message.dedupe_key,
+    )
     by_email = [u for u in recipients if prefs[u]["email"]]
     if by_email:
         business = await session.get(Business, business_id)

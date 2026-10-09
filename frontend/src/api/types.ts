@@ -363,6 +363,12 @@ export interface AppNotification {
 export interface ChannelPrefs {
   in_app: boolean;
   email: boolean;
+  push: boolean;
+}
+
+export interface PushConfig {
+  public_key: string | null;
+  devices: number;
 }
 
 export interface NotificationPreference {

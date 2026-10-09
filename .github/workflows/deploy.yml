@@ -81,6 +81,12 @@ jobs:
               echo "created $name"
             fi
           done
+          # Web Push (VAPID) signing key: an EC P-256 private key, base64url DER.
+          if ! az keyvault secret show --vault-name "$VAULT" --name vapid-private-key -o none 2>/dev/null; then
+            az keyvault secret set --vault-name "$VAULT" --name vapid-private-key -o none --value \
+              "$(openssl ecparam -name prime256v1 -genkey -noout -outform DER | basenc --base64url -w0 | tr -d '=')"
+            echo "created vapid-private-key"
+          fi
 
       - name: Infrastructure (network, database, storage, registry, email)
         id: base

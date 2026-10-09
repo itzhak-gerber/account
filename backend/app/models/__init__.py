@@ -24,6 +24,7 @@ from app.models.notifications import (
     Notification,
     NotificationEvent,
     NotificationPreference,
+    PushSubscription,
     UserDevice,
 )
 
@@ -51,6 +52,7 @@ __all__ = [
     "NotificationPreference",
     "OutboxEvent",
     "PaymentMethod",
+    "PushSubscription",
     "RelationType",
     "Role",
     "StoredFile",

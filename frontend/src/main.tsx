@@ -16,3 +16,11 @@ createRoot(document.getElementById("root")!).render(
     </BrowserRouter>
   </StrictMode>,
 );
+
+// The service worker delivers phone notifications (Web Push). Production builds only: in
+// development it would get in the way of hot reloading.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js");
+  });
+}

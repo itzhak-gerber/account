@@ -22,7 +22,7 @@ from app.emails.templates import notification_email
 from app.jobs import queue
 from app.models import Notification, NotificationEvent, User, UserDevice
 from app.schemas.notifications import DeviceOut
-from app.services import notifications
+from app.services import notifications, push
 
 DEVICE_COOKIE = "invoice_device"
 DEVICE_COOKIE_DAYS = 400  # the longest browsers keep a cookie
@@ -110,6 +110,8 @@ async def _alert(session: AsyncSession, user: User, device: UserDevice, when: da
                 dedupe_key=f"device:{device.id}",
             )
         )
+    if prefs["push"]:
+        push.queue_push(session, [user.id], title=title, link="/profile", tag=f"device:{device.id}")
     if prefs["email"]:
         email = notification_email(
             to=user.email,

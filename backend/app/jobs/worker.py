@@ -8,6 +8,7 @@ from typing import Any, ClassVar
 from zoneinfo import ZoneInfo
 
 import aiosmtplib
+import anyio
 import structlog
 from arq import Retry
 from arq.connections import RedisSettings
@@ -18,7 +19,7 @@ from sqlalchemy import text, update
 from app.core.config import get_settings
 from app.core.db import commit, get_sessionmaker, set_rls_context
 from app.models import DeliveryStatus, Document, DocumentDelivery, OutboxEvent
-from app.services import events, notifications
+from app.services import events, notifications, push
 from app.services.documents import today
 
 log = structlog.get_logger()
@@ -55,6 +56,40 @@ def _message(to: list[str] | str, subject: str, text: str, html: str) -> EmailMe
 async def send_email(ctx: dict[str, Any], *, to: str, subject: str, html: str, text: str) -> None:
     await _smtp_send(_message(to, subject, text, html))
     log.info("email.sent", subject=subject)
+
+
+async def send_push(
+    ctx: dict[str, Any], *, user_ids: list[str], title: str, link: str, tag: str
+) -> int:
+    """Push one message to every device of these users. Devices the push service reports as
+    gone (404/410) are forgotten; other failures are logged and not retried (the message is
+    also in the in-app inbox)."""
+    async with get_sessionmaker()() as session:
+        targets = (
+            await session.execute(
+                text("SELECT id, endpoint, p256dh, auth FROM push_targets(CAST(:users AS uuid[]))"),
+                {"users": user_ids},
+            )
+        ).all()
+        data = push.payload(title=title, link=link, tag=tag)
+        sent = 0
+        for target in targets:
+            if not push.endpoint_allowed(target.endpoint):
+                continue
+            subscription = {
+                "endpoint": target.endpoint,
+                "keys": {"p256dh": target.p256dh, "auth": target.auth},
+            }
+            status = await anyio.to_thread.run_sync(push.send_one, subscription, data)
+            if status in (404, 410):
+                await session.execute(
+                    text("SELECT forget_push_subscription(:id)"), {"id": target.id}
+                )
+            elif 200 <= status < 300:
+                sent += 1
+        await commit(session)
+    log.info("push.sent", devices=sent, of=len(targets))
+    return sent
 
 
 async def _record(
@@ -238,6 +273,7 @@ class WorkerSettings:
         ping,
         send_email,
         send_document_email,
+        func(send_push, max_tries=1),
         # No stored result, so the next "kick" with the same job id is accepted right away.
         func(dispatch_outbox, name=events.DISPATCH_JOB, keep_result=0),
         raise_overdue_events,

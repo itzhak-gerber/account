@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = False
     email_from: str = "חשבוניות <noreply@invoice.local>"
 
+    # Web Push (VAPID). The private key is base64url DER (EC P-256); empty disables push.
+    vapid_private_key: str = ""
+    # Contact for push services (mailto: or https URL); defaults to the public URL.
+    vapid_subject: str = ""
+
     # Requests per minute per client IP.
     rate_limit_auth_per_minute: int = 30
     rate_limit_api_per_minute: int = 600

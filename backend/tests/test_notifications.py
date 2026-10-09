@@ -234,6 +234,7 @@ async def test_preferences_choose_channels(idp: FakeIdP, sent_jobs: Jobs) -> Non
         assert {p["event"]: p["channels"] for p in defaults}["invoice_overdue"] == {
             "in_app": True,
             "email": True,
+            "push": True,
         }
         assert saved.status_code == 200
         assert await inbox(owner, bid, unread_only="true") == []

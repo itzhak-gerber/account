@@ -16,6 +16,7 @@ import { api, startLogin } from "../api/client";
 import { useSession } from "../auth/context";
 import { DevicesCard } from "../features/notifications/DevicesCard";
 import { PreferencesCard } from "../features/notifications/PreferencesCard";
+import { PushCard } from "../features/notifications/PushCard";
 import { errorMessage } from "../lib/errors";
 
 export function ProfilePage() {
@@ -47,6 +48,7 @@ export function ProfilePage() {
         </CardContent>
       </Card>
       <PreferencesCard />
+      <PushCard />
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={2}>

@@ -30,6 +30,27 @@ class MarkRead(BaseModel):
 class ChannelPrefs(BaseModel):
     in_app: bool = True
     email: bool = False
+    push: bool = False
+
+
+class PushKeys(BaseModel):
+    p256dh: str = Field(min_length=1, max_length=200)
+    auth: str = Field(min_length=1, max_length=100)
+
+
+class PushSubscriptionIn(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=1000)
+    keys: PushKeys
+
+
+class PushSubscriptionRef(BaseModel):
+    endpoint: str = Field(min_length=1, max_length=1000)
+
+
+class PushConfig(BaseModel):
+    # None when push is not configured on this server.
+    public_key: str | None
+    devices: int
 
 
 class PreferenceOut(BaseModel):

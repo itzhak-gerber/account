@@ -37,6 +37,12 @@ server {
         try_files $uri =404;
     }
 
+    # The installable-app manifest (phone home screen, push notifications).
+    location = /manifest.webmanifest {
+        types { application/manifest+json webmanifest; }
+        add_header Cache-Control "no-cache";
+    }
+
     location / {
         add_header Cache-Control "no-cache";
         add_header X-Content-Type-Options nosniff;

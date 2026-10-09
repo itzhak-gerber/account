@@ -12,9 +12,13 @@ from app.schemas.notifications import (
     NotificationOut,
     PreferenceOut,
     PreferencesIn,
+    PushConfig,
+    PushSubscriptionIn,
+    PushSubscriptionRef,
     UnreadCount,
 )
-from app.services import devices, notifications
+from app.services import devices, notifications, push
+from app.services.devices import describe as describe_device
 
 router = APIRouter(tags=["notifications"])
 
@@ -71,4 +75,42 @@ async def forget_device(
     device_id: uuid.UUID, principal: CurrentPrincipal, session: DbSession
 ) -> None:
     await devices.forget(session, principal.user_id, device_id)
+    await commit(session)
+
+
+@router.get("/me/push")
+async def push_config(principal: CurrentPrincipal, session: DbSession) -> PushConfig:
+    """The key browsers subscribe with, and how many devices this user registered."""
+    return PushConfig(public_key=push.public_key(), devices=await push.count(session, principal))
+
+
+@router.put("/me/push", status_code=status.HTTP_204_NO_CONTENT)
+async def push_subscribe(
+    request: Request, principal: CurrentPrincipal, data: PushSubscriptionIn, session: DbSession
+) -> None:
+    await push.subscribe(
+        session,
+        principal,
+        endpoint=data.endpoint,
+        p256dh=data.keys.p256dh,
+        auth=data.keys.auth,
+        label=describe_device(request.headers.get("user-agent", "")),
+    )
+    await commit(session)
+
+
+@router.post("/me/push/unsubscribe", status_code=status.HTTP_204_NO_CONTENT)
+async def push_unsubscribe(
+    principal: CurrentPrincipal, data: PushSubscriptionRef, session: DbSession
+) -> None:
+    await push.unsubscribe(session, principal, data.endpoint)
+    await commit(session)
+
+
+@router.post("/me/push/test", status_code=status.HTTP_202_ACCEPTED)
+async def push_test(principal: CurrentPrincipal, session: DbSession) -> None:
+    """Send a test notification to all of this user's devices."""
+    push.queue_push(
+        session, [principal.user_id], title="התראת בדיקה מחשבוניות", link="/profile", tag="test"
+    )
     await commit(session)

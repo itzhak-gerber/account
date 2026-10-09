@@ -157,6 +157,7 @@ export function fixtureBody(url: string, me: unknown = ME): unknown {
         { event: "new_device_login", channels: { in_app: true, email: true } },
       ],
     ],
+    [/^\/me\/push$/, { public_key: "BOrdKG6EE4p7xmFX0MLjIZGDZuxxGM4ZFG2XCxPEcwbW4", devices: 1 }],
     [/\/document-types$/, TYPES],
     [/\/documents\/numbering$/, { next_numbers: { tax_invoice: 2, receipt: 1 } }],
     [/\/documents\/d1$/, DOCUMENT],

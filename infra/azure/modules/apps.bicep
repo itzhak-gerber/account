@@ -45,6 +45,7 @@ var backendSecretNames = [
   'web-client-secret'
   'app-secret-key'
   'smtp-password'
+  'vapid-private-key'
 ]
 
 var backendEnv = [
@@ -65,6 +66,7 @@ var backendEnv = [
   { name: 'APP_SMTP_USE_TLS', value: 'true' }
   { name: 'APP_SMTP_USERNAME', value: smtpUsername }
   { name: 'APP_SMTP_PASSWORD', secretRef: 'smtp-password' }
+  { name: 'APP_VAPID_PRIVATE_KEY', secretRef: 'vapid-private-key' }
   { name: 'APP_EMAIL_FROM', value: 'חשבוניות <${smtpFrom}>' }
   { name: 'APP_STORAGE_BACKEND', value: 'azure' }
   { name: 'APP_AZURE_STORAGE_ACCOUNT_URL', value: storageAccountUrl }

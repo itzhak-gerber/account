@@ -15,7 +15,7 @@ import { api } from "../../api/client";
 import type { ChannelPrefs, NotificationEvent, NotificationPreference } from "../../api/types";
 import { errorMessage } from "../../lib/errors";
 
-const CHANNELS: (keyof ChannelPrefs)[] = ["in_app", "email"];
+const CHANNELS: (keyof ChannelPrefs)[] = ["in_app", "push", "email"];
 const PATH = "/me/notification-preferences";
 
 export function PreferencesCard() {
