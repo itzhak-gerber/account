@@ -157,7 +157,8 @@ describe("DocumentEditor", () => {
       customer: { name: "לקוח" },
       lines: [{ description: "ייעוץ", quantity: "1", unit_price: "1000" }],
     });
-  });
+    // Types a whole invoice key by key: about 3s locally, more on CI runners.
+  }, 20000);
 
   it("starts a receipt from an unpaid invoice with its balance pre-filled", async () => {
     const calls: { method: string; url: string; body: unknown }[] = [];
