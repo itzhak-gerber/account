@@ -571,6 +571,29 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
   `/Invoices/v2/Approval`, field names, how the number is read from the answer) is isolated in
   `services/ita_client.py`; confirm it in the sandbox before production.
 
+### M8 security review (2026-10-09)
+
+Checked and in place: every service function checks the role's permission; every table with
+business data has row-level security (the app's database role cannot bypass it); IDs from
+requests are always looked up within the business; CSRF token on every state-changing request
+with a cookie session; httpOnly SameSite session cookie, tokens never reach the browser;
+OAuth state signed and bound to the user (login, tax authority); push endpoints limited to the
+browsers' push services (no server-side request forgery); Excel cells written as text (no formula
+injection); PDF templates escape HTML; uploaded logos re-encoded; rate limits on login and API;
+API responses carry a strict CSP, HSTS, X-Frame-Options; secrets only in Key Vault; tax
+authority tokens encrypted.
+
+Fixed in this review: the web app's pages had no Content-Security-Policy or HSTS (only the API
+had them). nginx now sends a CSP that allows only the app's own scripts (inline styles allowed
+for the UI library), and HSTS. The browser check in CI serves every screen under this exact
+policy and fails on any violation.
+
+Added to CI: `pip-audit` (server libraries) and `npm audit --omit=dev` (browser libraries) fail
+the build on a known vulnerability. Both clean today.
+
+Still open for production: an external penetration test; key rotation for the token key;
+long-term (7-year) database backups (see data protection below).
+
 ### M7 implementation notes (for CPA review)
 
 - Reports read the totals stored on issued documents; drafts are never included. Amounts are ILS.

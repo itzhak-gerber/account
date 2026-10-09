@@ -50,6 +50,10 @@ jobs:
       - name: PDF rendering libraries
         run: sudo apt-get update && sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
       - run: uv sync --frozen
+      - name: No known vulnerabilities in the server's libraries
+        run: |
+          uv export --frozen --no-dev --no-hashes --no-emit-project -o requirements-audit.txt
+          uvx pip-audit -r requirements-audit.txt --progress-spinner off
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy app tests
@@ -89,6 +93,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: No known vulnerabilities in the libraries shipped to browsers
+        run: npm audit --omit=dev
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck

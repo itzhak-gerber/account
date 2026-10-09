@@ -11,6 +11,10 @@ import { fixtureBody, ME } from "../src/test/apiFixtures.ts";
 
 const require = createRequire(import.meta.url);
 const AXE = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
+// The production Content-Security-Policy (from the nginx config): every screen must work under it.
+const CSP = readFileSync(new URL("../deploy/default.conf.template", import.meta.url), "utf8").match(
+  /Content-Security-Policy "([^"]+)"/,
+)[1];
 const PORT = 4179;
 const BASE = `http://localhost:${PORT}`;
 const SCREENS = [
@@ -63,10 +67,26 @@ try {
       await page.route("**/api/v1/**", (route) =>
         route.fulfill({ json: fixtureBody(new URL(route.request().url()).pathname, me) }),
       );
+      await page.route(
+        (url) => url.origin === BASE && !url.pathname.startsWith("/api/"),
+        async (route) => {
+          if (route.request().resourceType() !== "document") return route.continue();
+          const response = await route.fetch();
+          await route.fulfill({
+            response,
+            headers: { ...response.headers(), "content-security-policy": CSP },
+          });
+        },
+      );
+      const blocked = [];
+      page.on("console", (m) => {
+        if (/Content Security Policy/i.test(m.text())) blocked.push(m.text().slice(0, 200));
+      });
       await page.goto(BASE + path);
       await page.locator("main h1, h1").first().waitFor();
       await page.waitForTimeout(500);
-      await page.addScriptTag({ content: AXE });
+      // Evaluated by the test driver, so the page's CSP (no inline scripts) does not apply.
+      await page.evaluate(AXE);
       const violations = await page.evaluate(async () => {
         const result = await window.axe.run(document, {
           runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "best-practice"] },
@@ -81,7 +101,11 @@ try {
         }));
       });
       const label = `${name} (${size})`;
-      if (violations.length === 0) console.log(`ok    ${label}`);
+      for (const text of blocked) {
+        failures++;
+        console.log(`FAIL  ${label}: blocked by the Content-Security-Policy: ${text}`);
+      }
+      if (violations.length === 0 && blocked.length === 0) console.log(`ok    ${label}`);
       for (const v of violations) {
         failures++;
         console.log(`FAIL  ${label}: ${v.id} [${v.impact}] ${v.help}`);
