@@ -94,9 +94,6 @@ export function PreferencesCard() {
             </TableBody>
           </Table>
         )}
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          {t("notifications.pushLater")}
-        </Typography>
       </CardContent>
     </Card>
   );
