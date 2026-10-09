@@ -30,7 +30,7 @@ param emailRoleId string
 param imageTag string = ''
 @description('PostgreSQL compute size; capacity for small sizes varies by region and subscription.')
 param postgresSku string = 'Standard_B1ms'
-@allowed(['Burstable', 'GeneralPurpose'])
+@allowed(['Burstable', 'GeneralPurpose', 'MemoryOptimized'])
 param postgresTier string = 'Burstable'
 @description('Availability zone for PostgreSQL ("1", "2", "3"), or empty to let Azure choose.')
 param postgresZone string = ''

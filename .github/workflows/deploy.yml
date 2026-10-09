@@ -104,6 +104,14 @@ jobs:
 
           for candidate in "${candidates[@]}"; do
             IFS=: read -r sku tier zone <<<"$candidate"
+            # Azure may omit the tier (e.g. right after a paused server starts): derive it.
+            if [ -z "$tier" ]; then
+              case "$sku" in
+                Standard_B*) tier=Burstable ;;
+                Standard_E*) tier=MemoryOptimized ;;
+                *) tier=GeneralPurpose ;;
+              esac
+            fi
             echo "database: $sku ($tier), zone ${zone:-any}"
             if az deployment group create --resource-group "$RG" --name "base-$GITHUB_RUN_ID" \
                 --template-file infra/azure/main.bicep \
