@@ -107,7 +107,8 @@ jobs:
           fi
           # Signing certificate for issued PDFs (base64 PKCS#12) and its password, put here by
           # hand once bought; "unset" leaves PDFs unsigned.
-          for name in pdf-signing-p12 pdf-signing-password; do
+          # anthropic-api-key: reading photographed supplier invoices ("unset": typed by hand).
+          for name in pdf-signing-p12 pdf-signing-password anthropic-api-key; do
             if ! az keyvault secret show --vault-name "$VAULT" --name "$name" -o none 2>/dev/null; then
               az keyvault secret set --vault-name "$VAULT" --name "$name" -o none --value unset
               echo "created $name placeholder"

@@ -6,6 +6,7 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
+import Link from "@mui/material/Link";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
@@ -18,7 +19,13 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import type { PurchaseOrder, SupplierInvoice, SupplierInvoiceInput } from "../../api/types";
+import type {
+  PurchaseOrder,
+  ScanResult,
+  Supplier,
+  SupplierInvoice,
+  SupplierInvoiceInput,
+} from "../../api/types";
 import { cleanAmount, finishAmount } from "../../lib/amount";
 import { errorMessage } from "../../lib/errors";
 import { formatMoney } from "../../lib/money";
@@ -33,10 +40,13 @@ const money = (value: string) => String(Number(value));
 export function SupplierInvoiceDialog({
   businessId,
   invoice,
+  scan,
   onClose,
 }: {
   businessId: string;
   invoice: SupplierInvoice | null;
+  /** A photographed invoice: its kept file, and the fields read from it (to be checked). */
+  scan?: ScanResult;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -51,19 +61,35 @@ export function SupplierInvoiceDialog({
           vat_amount: money(invoice.vat_amount),
         }
       : {
-          supplier_id: "",
+          supplier_id: scan?.supplier_id ?? "",
           purchase_order_id: null,
-          invoice_number: "",
-          invoice_date: israelToday(),
+          invoice_number: scan?.invoice_number ?? "",
+          invoice_date: scan?.invoice_date ?? israelToday(),
           due_date: null,
-          net_amount: "",
-          vat_amount: "",
+          net_amount: scan?.net_amount ? money(scan.net_amount) : "",
+          vat_amount: scan?.vat_amount ? money(scan.vat_amount) : "",
           paid_date: null,
           notes: "",
+          file_id: scan?.file_id ?? null,
         },
   );
   // VAT follows the net amount until it is typed in by hand (e.g. part of the invoice exempt).
-  const [vatByHand, setVatByHand] = useState(Boolean(invoice));
+  const [vatByHand, setVatByHand] = useState(Boolean(invoice) || Boolean(scan?.vat_amount));
+  // A supplier read from the photo that is not in the list yet can be added in one step.
+  const addSupplier = useMutation({
+    mutationFn: () =>
+      api.post<Supplier>(`/businesses/${businessId}/suppliers`, {
+        name: scan!.supplier_name,
+        tax_id: scan!.supplier_tax_id ?? "",
+      }),
+    onSuccess: async (created) => {
+      await queryClient.invalidateQueries({ queryKey: ["business", businessId, "suppliers"] });
+      set({ supplier_id: created.id });
+    },
+  });
+  const fileUrl = invoice?.file_id
+    ? `/api/v1/businesses/${businessId}/supplier-invoices/${invoice.id}/file`
+    : null;
   const [touched, setTouched] = useState(false);
   const orders = useQuery({
     queryKey: ["business", businessId, "purchase-orders"],
@@ -128,6 +154,33 @@ export function SupplierInvoiceDialog({
           <Stack spacing={2} sx={{ pt: 1 }}>
             {(save.isError || remove.isError) && (
               <Alert severity="error">{errorMessage(t, save.error ?? remove.error)}</Alert>
+            )}
+            {scan && (
+              <Alert severity={scan.read ? "info" : "warning"}>
+                {scan.read ? t("scan.read") : scan.ai_enabled ? t("scan.notRead") : t("scan.kept")}
+              </Alert>
+            )}
+            {scan?.supplier_name && !value.supplier_id && (
+              <Alert
+                severity="info"
+                action={
+                  <Button
+                    color="inherit"
+                    size="small"
+                    disabled={addSupplier.isPending}
+                    onClick={() => addSupplier.mutate()}
+                  >
+                    {t("scan.addSupplier")}
+                  </Button>
+                }
+              >
+                {t("scan.newSupplier", { name: scan.supplier_name })}
+              </Alert>
+            )}
+            {fileUrl && (
+              <Link href={fileUrl} target="_blank" rel="noopener">
+                {t("scan.viewFile")}
+              </Link>
             )}
             <SupplierPicker
               businessId={businessId}

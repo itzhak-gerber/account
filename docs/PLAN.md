@@ -606,6 +606,21 @@ long-term (7-year) database backups (see data protection below).
 - To confirm with a CPA: that this meets the "secure electronic signature" requirement for
   computerised documents sent electronically, and that customers agree to receive them so.
 
+### Photographed supplier invoices
+
+- רכש → חשבוניות ספקים → "צילום חשבונית" (phone camera) or "העלאת קובץ" (photo or PDF, up to
+  15 MB). A photo is re-encoded (metadata such as GPS dropped) and kept as a one-page PDF; every
+  kept file is signed like issued documents when a certificate is configured. The file is linked
+  to the invoice (`supplier_invoices.file_id`) and viewable from it.
+- With an Anthropic API key (Key Vault `anthropic-api-key`), Claude (`claude-opus-5-5`, low
+  effort, structured JSON output, server-side refusal fallback) reads the supplier, tax ID,
+  number, date, net, VAT and total. Values are checked (tax ID check digit, ISO date, amounts)
+  before they are suggested; the supplier is matched by tax ID or name, or offered to be added.
+  The user always reviews and saves. Without a key the file is kept and fields are typed.
+- Privacy: invoice images are sent to Anthropic for reading; the privacy policy must say so.
+- Not yet: discarding the paper. That needs the tax authority's scanning rules (software
+  registered for scanning, signed at scan time); confirm with a CPA during registration.
+
 ### M7 implementation notes (for CPA review)
 
 - Reports read the totals stored on issued documents; drafts are never included. Amounts are ILS.

@@ -179,6 +179,8 @@ class SupplierInvoice(IdMixin, TimestampMixin, Base):
     vat_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     paid_date: Mapped[date | None] = mapped_column(Date)
     notes: Mapped[str] = mapped_column(Text, default="")
+    # The photo or PDF of the invoice (kept as a PDF, signed when signing is set up).
+    file_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("files.id"))
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
 
     supplier: Mapped[Supplier] = relationship(lazy="joined", innerjoin=True)

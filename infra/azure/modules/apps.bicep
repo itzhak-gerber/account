@@ -54,6 +54,7 @@ var backendSecretNames = [
   'ita-token-key'
   'pdf-signing-p12'
   'pdf-signing-password'
+  'anthropic-api-key'
 ]
 
 var backendEnv = [
@@ -83,6 +84,7 @@ var backendEnv = [
   { name: 'APP_PDF_SIGNING_P12', secretRef: 'pdf-signing-p12' }
   { name: 'APP_PDF_SIGNING_PASSWORD', secretRef: 'pdf-signing-password' }
   { name: 'APP_PDF_SIGNING_TSA_URL', value: pdfSigningTsaUrl }
+  { name: 'APP_ANTHROPIC_API_KEY', secretRef: 'anthropic-api-key' }
   { name: 'APP_EMAIL_FROM', value: 'חשבוניות <${smtpFrom}>' }
   { name: 'APP_STORAGE_BACKEND', value: 'azure' }
   { name: 'APP_AZURE_STORAGE_ACCOUNT_URL', value: storageAccountUrl }

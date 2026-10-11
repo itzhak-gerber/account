@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     pdf_signing_password: str = ""
     pdf_signing_tsa_url: str = ""
 
+    # Reading photographed supplier invoices with Claude. Empty or "unset": typed by hand.
+    anthropic_api_key: str = ""
+    expense_ai_model: str = "claude-opus-5-5"
+
     # Web Push (VAPID). The private key is base64url DER (EC P-256); empty disables push.
     vapid_private_key: str = ""
     # Contact for push services (mailto: or https URL); defaults to the public URL.

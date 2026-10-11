@@ -170,6 +170,7 @@ const SUPPLIER_INVOICES = [
     total: "354.00",
     paid_date: null,
     notes: "",
+    file_id: "f1",
     created_at: "2026-10-05T09:00:00Z",
   },
   {
@@ -184,6 +185,7 @@ const SUPPLIER_INVOICES = [
     total: "118.00",
     paid_date: "2026-09-30",
     notes: "",
+    file_id: null,
     created_at: "2026-09-20T09:00:00Z",
   },
 ];

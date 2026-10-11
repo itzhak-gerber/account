@@ -185,6 +185,7 @@ class SupplierInvoiceIn(BaseModel):
     vat_amount: Money
     paid_date: date | None = None
     notes: Text2000 = ""
+    file_id: uuid.UUID | None = None  # from a scan
 
 
 class SupplierInvoicePatch(BaseModel):
@@ -196,6 +197,7 @@ class SupplierInvoicePatch(BaseModel):
     vat_amount: Money | None = None
     paid_date: date | None = None  # send null to mark as unpaid
     notes: Text2000 | None = None
+    file_id: uuid.UUID | None = None
 
 
 class SupplierInvoiceOut(BaseModel):
@@ -211,4 +213,21 @@ class SupplierInvoiceOut(BaseModel):
     total: Decimal
     paid_date: date | None
     notes: str
+    file_id: uuid.UUID | None
     created_at: datetime
+
+
+class ScanOut(BaseModel):
+    """A kept file and what could be read from it (fields absent when not read)."""
+
+    file_id: uuid.UUID
+    read: bool
+    ai_enabled: bool
+    supplier_id: uuid.UUID | None = None
+    supplier_name: str | None = None
+    supplier_tax_id: str | None = None
+    invoice_number: str | None = None
+    invoice_date: date | None = None
+    net_amount: Decimal | None = None
+    vat_amount: Decimal | None = None
+    total: Decimal | None = None

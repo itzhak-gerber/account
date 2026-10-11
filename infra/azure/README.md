@@ -111,6 +111,13 @@ rm cert.p12
 Optionally add the authority's timestamp service to `AZURE_ENV` (`"pdfSigningTsaUrl": "https://..."`),
 then run Deploy.
 
+## Reading photographed supplier invoices (optional)
+
+With an Anthropic API key, a photo or PDF of a supplier invoice is read by Claude and the
+fields are suggested; without one, the file is kept and the fields are typed by hand. Create a
+key at console.anthropic.com and store it only in Key Vault, then run Deploy:
+`az keyvault secret set --vault-name <vault> -n anthropic-api-key --value '<key>'`.
+
 ## Useful commands (Cloud Shell)
 
 ```bash

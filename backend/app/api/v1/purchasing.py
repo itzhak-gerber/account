@@ -1,7 +1,8 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, UploadFile, status
+from fastapi.responses import Response
 
 from app.auth.principal import CurrentBusiness, DbSession
 from app.core.db import commit
@@ -12,6 +13,7 @@ from app.schemas.purchasing import (
     OrderPatch,
     ReceiptIn,
     ReceiptOut,
+    ScanOut,
     SupplierIn,
     SupplierInvoiceIn,
     SupplierInvoiceOut,
@@ -19,7 +21,7 @@ from app.schemas.purchasing import (
     SupplierOut,
     SupplierPatch,
 )
-from app.services import purchasing
+from app.services import expense_capture, purchasing
 
 router = APIRouter(prefix="/businesses/{business_id}", tags=["purchasing"])
 Limit = Annotated[int, Query(ge=1, le=500)]
@@ -161,6 +163,25 @@ async def list_invoices(
         session, ctx, unpaid=unpaid, supplier_id=supplier_id, limit=limit
     )
     return [SupplierInvoiceOut.model_validate(i) for i in rows]
+
+
+@router.post("/supplier-invoices/scan", status_code=status.HTTP_201_CREATED)
+async def scan_invoice(ctx: CurrentBusiness, session: DbSession, file: UploadFile) -> ScanOut:
+    """Keep a photo / PDF of a supplier invoice and suggest its fields (save it with file_id)."""
+    data = await file.read(expense_capture.MAX_UPLOAD_BYTES + 1)
+    out = ScanOut.model_validate(await expense_capture.scan(session, ctx, data))
+    await commit(session)
+    return out
+
+
+@router.get("/supplier-invoices/{invoice_id}/file")
+async def invoice_file(ctx: CurrentBusiness, invoice_id: uuid.UUID, session: DbSession) -> Response:
+    content = await purchasing.invoice_file(session, ctx, invoice_id)
+    return Response(
+        content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline", "Cache-Control": "private, no-store"},
+    )
 
 
 @router.post("/supplier-invoices", status_code=status.HTTP_201_CREATED)

@@ -274,6 +274,22 @@ export interface SupplierInvoiceInput {
   vat_amount: string;
   paid_date: string | null;
   notes: string;
+  file_id: string | null;
+}
+
+/** A kept photo / PDF of a supplier invoice, and what could be read from it. */
+export interface ScanResult {
+  file_id: string;
+  read: boolean;
+  ai_enabled: boolean;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+  supplier_tax_id?: string | null;
+  invoice_number?: string | null;
+  invoice_date?: string | null;
+  net_amount?: string | null;
+  vat_amount?: string | null;
+  total?: string | null;
 }
 
 export interface SupplierInvoice extends Omit<SupplierInvoiceInput, "supplier_id"> {

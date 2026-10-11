@@ -1,4 +1,8 @@
 import AddIcon from "@mui/icons-material/Add";
+import AttachFileOutlined from "@mui/icons-material/AttachFileOutlined";
+import PhotoCameraOutlined from "@mui/icons-material/PhotoCameraOutlined";
+import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
+import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
@@ -13,12 +17,13 @@ import TableRow from "@mui/material/TableRow";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
-import type { SupplierInvoice } from "../../api/types";
+import type { ScanResult, SupplierInvoice } from "../../api/types";
+import { errorMessage } from "../../lib/errors";
 import { formatDate, formatMoney } from "../../lib/money";
 import { israelToday } from "../documents/helpers";
 import { SupplierInvoiceDialog } from "./SupplierInvoiceDialog";
@@ -29,6 +34,19 @@ export function InvoicesTab({ businessId, canEdit }: { businessId: string; canEd
   const { t } = useTranslation();
   const [filter, setFilter] = useState<Filter>("unpaid");
   const [editing, setEditing] = useState<SupplierInvoice | null | "new">(null);
+  const [scanned, setScanned] = useState<ScanResult | null>(null);
+  const camera = useRef<HTMLInputElement>(null);
+  const files = useRef<HTMLInputElement>(null);
+  const scan = useMutation({
+    mutationFn: (file: File) =>
+      api.upload<ScanResult>(`/businesses/${businessId}/supplier-invoices/scan`, file, "POST"),
+    onSuccess: (result) => setScanned(result),
+  });
+  const pick = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) scan.mutate(file);
+  };
   const invoices = useQuery({
     queryKey: ["business", businessId, "supplier-invoices"],
     queryFn: () => api.get<SupplierInvoice[]>(`/businesses/${businessId}/supplier-invoices`),
@@ -61,9 +79,42 @@ export function InvoicesTab({ businessId, canEdit }: { businessId: string; canEd
       </Stack>
       <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
         {canEdit && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
-            {t("supplierInvoices.new")}
-          </Button>
+          <>
+            <input
+              ref={camera}
+              hidden
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={pick}
+            />
+            <input
+              ref={files}
+              hidden
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={pick}
+            />
+            <Button
+              variant="contained"
+              startIcon={<PhotoCameraOutlined />}
+              disabled={scan.isPending}
+              onClick={() => camera.current?.click()}
+            >
+              {scan.isPending ? t("scan.reading") : t("scan.photo")}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<UploadFileOutlined />}
+              disabled={scan.isPending}
+              onClick={() => files.current?.click()}
+            >
+              {t("scan.upload")}
+            </Button>
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
+              {t("supplierInvoices.new")}
+            </Button>
+          </>
         )}
         <ToggleButtonGroup
           size="small"
@@ -76,6 +127,7 @@ export function InvoicesTab({ businessId, canEdit }: { businessId: string; canEd
           <ToggleButton value="all">{t("supplierInvoices.all")}</ToggleButton>
         </ToggleButtonGroup>
       </Stack>
+      {scan.isError && <Alert severity="error">{errorMessage(t, scan.error)}</Alert>}
       <Card variant="outlined">
         {invoices.data && shown.length === 0 && (
           <Typography sx={{ p: 2 }} color="text.secondary">
@@ -98,7 +150,16 @@ export function InvoicesTab({ businessId, canEdit }: { businessId: string; canEd
               <TableBody>
                 {shown.map((i) => (
                   <TableRow key={i.id} hover>
-                    <TableCell>{i.supplier.name}</TableCell>
+                    <TableCell>
+                      {i.supplier.name}
+                      {i.file_id && (
+                        <AttachFileOutlined
+                          fontSize="small"
+                          titleAccess={t("scan.hasFile")}
+                          sx={{ verticalAlign: "middle", ms: 0.5, color: "text.secondary" }}
+                        />
+                      )}
+                    </TableCell>
                     <TableCell>
                       {canEdit ? (
                         <Button size="small" onClick={() => setEditing(i)}>
@@ -142,6 +203,14 @@ export function InvoicesTab({ businessId, canEdit }: { businessId: string; canEd
           businessId={businessId}
           invoice={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {scanned && (
+        <SupplierInvoiceDialog
+          businessId={businessId}
+          invoice={null}
+          scan={scanned}
+          onClose={() => setScanned(null)}
         />
       )}
     </Stack>

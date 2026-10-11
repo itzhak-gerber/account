@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import BusinessContext
 from app.core.errors import AppError, Conflict, NotFound
+from app.core.storage import get_storage
 from app.models import (
     GoodsReceipt,
     GoodsReceiptLine,
@@ -26,6 +27,7 @@ from app.models import (
     OrderStatus,
     PurchaseOrder,
     PurchaseOrderLine,
+    StoredFile,
     Supplier,
     SupplierInvoice,
 )
@@ -507,6 +509,7 @@ async def create_invoice(
 ) -> SupplierInvoice:
     require(ctx.role, Permission.MANAGE_PURCHASING)
     supplier = await get_supplier(session, ctx, data.supplier_id)
+    await _check_file(session, ctx, data.file_id)
     await _check_invoice(
         session,
         ctx,
@@ -539,7 +542,27 @@ async def create_invoice(
     return invoice
 
 
-_NULLABLE = {"due_date", "paid_date", "purchase_order_id"}
+_NULLABLE = {"due_date", "paid_date", "purchase_order_id", "file_id"}
+
+
+async def _check_file(
+    session: AsyncSession, ctx: BusinessContext, file_id: uuid.UUID | None
+) -> None:
+    if file_id is None:
+        return
+    file = await session.get(StoredFile, file_id)
+    if file is None or file.business_id != ctx.business_id:
+        raise NotFound("File not found", code="file_not_found")
+
+
+async def invoice_file(session: AsyncSession, ctx: BusinessContext, invoice_id: uuid.UUID) -> bytes:
+    """The photo / PDF kept with a supplier invoice."""
+    invoice = await get_invoice(session, ctx, invoice_id)
+    if invoice.file_id is None:
+        raise NotFound("No file", code="file_not_found")
+    file = await session.get(StoredFile, invoice.file_id)
+    assert file is not None
+    return await get_storage().get(file.storage_key)
 
 
 async def update_invoice(
@@ -555,6 +578,7 @@ async def update_invoice(
         for k, v in patch.model_dump(exclude_unset=True).items()
         if v is not None or k in _NULLABLE
     }
+    await _check_file(session, ctx, values.get("file_id"))
     if "invoice_number" in values or values.get("purchase_order_id"):
         await _check_invoice(
             session,
