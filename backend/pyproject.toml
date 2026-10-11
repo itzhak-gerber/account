@@ -28,6 +28,7 @@ dependencies = [
     "azure-identity>=1.26.0",
     "aiohttp>=3.14.4",
     "pywebpush>=2",
+    "pyhanko>=0.29",
 ]
 
 [dependency-groups]

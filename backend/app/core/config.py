@@ -82,6 +82,12 @@ class Settings(BaseSettings):
     openformat_maker_tax_id: str = "0"
     openformat_maker_name: str = ""
 
+    # Digital signature on issued PDFs: the certificate as base64 PKCS#12, its password, and an
+    # optional RFC 3161 timestamp service. Empty or "unset": PDFs are not signed.
+    pdf_signing_p12: str = ""
+    pdf_signing_password: str = ""
+    pdf_signing_tsa_url: str = ""
+
     # Web Push (VAPID). The private key is base64url DER (EC P-256); empty disables push.
     vapid_private_key: str = ""
     # Contact for push services (mailto: or https URL); defaults to the public URL.

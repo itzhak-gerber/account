@@ -42,6 +42,8 @@ jobs:
       ITA_CLIENT_ID: ${{ fromJSON(vars.AZURE_ENV).itaClientId || '' }}
       ITA_ENABLED: ${{ fromJSON(vars.AZURE_ENV).itaEnabled || 'false' }}
       ITA_ENVIRONMENT: ${{ fromJSON(vars.AZURE_ENV).itaEnvironment || 'sandbox' }}
+      # Timestamp service of the certificate authority (optional) for signed PDFs.
+      PDF_SIGNING_TSA_URL: ${{ fromJSON(vars.AZURE_ENV).pdfSigningTsaUrl || '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -103,6 +105,14 @@ jobs:
             az keyvault secret set --vault-name "$VAULT" --name ita-client-secret -o none --value unset
             echo "created ita-client-secret placeholder"
           fi
+          # Signing certificate for issued PDFs (base64 PKCS#12) and its password, put here by
+          # hand once bought; "unset" leaves PDFs unsigned.
+          for name in pdf-signing-p12 pdf-signing-password; do
+            if ! az keyvault secret show --vault-name "$VAULT" --name "$name" -o none 2>/dev/null; then
+              az keyvault secret set --vault-name "$VAULT" --name "$name" -o none --value unset
+              echo "created $name placeholder"
+            fi
+          done
 
       - name: Infrastructure (network, database, storage, registry, email)
         id: base
@@ -211,6 +221,7 @@ jobs:
                          computeLocation="$COMPUTE_LOCATION" \
                          itaClientId="$ITA_CLIENT_ID" itaEnabled="$ITA_ENABLED" \
                          itaEnvironment="$ITA_ENVIRONMENT" \
+                         pdfSigningTsaUrl="$PDF_SIGNING_TSA_URL" \
             --query properties.outputs -o json > apps.json
           echo "app_url=$(jq -r .appUrl.value apps.json)" >> "$GITHUB_OUTPUT"
           echo "auth_url=$(jq -r .authUrl.value apps.json)" >> "$GITHUB_OUTPUT"

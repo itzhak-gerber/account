@@ -17,6 +17,7 @@ param smtpFrom string
 param itaClientId string
 param itaEnabled string
 param itaEnvironment string
+param pdfSigningTsaUrl string
 
 var appHost = 'invoice.${defaultDomain}'
 var appUrl = 'https://${appHost}'
@@ -51,6 +52,8 @@ var backendSecretNames = [
   'vapid-private-key'
   'ita-client-secret'
   'ita-token-key'
+  'pdf-signing-p12'
+  'pdf-signing-password'
 ]
 
 var backendEnv = [
@@ -77,6 +80,9 @@ var backendEnv = [
   { name: 'APP_ITA_CLIENT_ID', value: itaClientId }
   { name: 'APP_ITA_CLIENT_SECRET', secretRef: 'ita-client-secret' }
   { name: 'APP_ITA_TOKEN_KEY', secretRef: 'ita-token-key' }
+  { name: 'APP_PDF_SIGNING_P12', secretRef: 'pdf-signing-p12' }
+  { name: 'APP_PDF_SIGNING_PASSWORD', secretRef: 'pdf-signing-password' }
+  { name: 'APP_PDF_SIGNING_TSA_URL', value: pdfSigningTsaUrl }
   { name: 'APP_EMAIL_FROM', value: 'חשבוניות <${smtpFrom}>' }
   { name: 'APP_STORAGE_BACKEND', value: 'azure' }
   { name: 'APP_AZURE_STORAGE_ACCOUNT_URL', value: storageAccountUrl }

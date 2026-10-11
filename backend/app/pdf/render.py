@@ -11,6 +11,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import HTML
 
 from app.models import BusinessType, Document, DocumentType, PaymentMethod, VatType
+from app.pdf import signing
 from app.services.document_rules import RULES
 
 Variant = Literal["original", "copy", "draft"]
@@ -173,4 +174,5 @@ async def render_pdf(
     pdf: bytes = await anyio.to_thread.run_sync(
         lambda: HTML(string=html).write_pdf(pdf_variant="pdf/ua-1")
     )
-    return pdf
+    # Issued documents are signed (original and copies); a draft preview is not a document.
+    return pdf if variant == "draft" else await signing.sign(pdf)

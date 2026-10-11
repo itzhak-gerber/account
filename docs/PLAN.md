@@ -495,7 +495,7 @@ Each feature milestone includes REST, MCP tools, UI, tests, and audit logging.
 | **M7** | Reports and dashboard | ✅ income and VAT per period (taxable / zero-rated / exempt), money received by payment method, open balances with aging, Excel export, dashboard figures and 12-month chart, MCP `get_report` |
 | **M7b** | Accessibility | 🟡 Israeli Standard 5568 (= WCAG 2.0 AA, required by law for services to the public). Done: axe on every screen in unit tests and in Chromium (contrast; desktop and phone) in CI, Keycloak login/registration pages checked, skip link, page titles and focus on navigation, semantic lists/links, keyboard-scrollable tables, accessible chart, AA colour contrast, tagged PDFs (PDF/UA), public accessibility statement page (`/accessibility`). Remaining: accessibility coordinator's contact details for the statement, a manual screen-reader pass (NVDA / VoiceOver / TalkBack) |
 | **M8** | Production hardening | Azure staging + production, observability, backups/restore drill, load test, security review and pen test, privacy policy and terms |
-| **Later** | | Inventory module (§10), WhatsApp/SMS, recurring invoices, online card payment links, multi-currency, accountant portal, digitally signed PDFs, English UI, subscription billing |
+| **Later** | | WhatsApp/SMS, recurring invoices, online card payment links, multi-currency, accountant portal, English UI, subscription billing |
 
 ---
 
@@ -593,6 +593,18 @@ the build on a known vulnerability. Both clean today.
 
 Still open for production: an external penetration test; key rotation for the token key;
 long-term (7-year) database backups (see data protection below).
+
+### Digital signature on issued PDFs
+
+- Every PDF of an issued document (the stored original, each copy, the copies in the data export)
+  carries a PAdES certification signature that allows no changes (`app/pdf/signing.py`, pyHanko);
+  draft previews are not signed. Any change to the file breaks the signature (tested).
+- Certificate: an organisational signing certificate from an Israeli certificate authority, as
+  base64 PKCS#12 in Key Vault (`pdf-signing-p12`, `pdf-signing-password`), optional RFC 3161
+  timestamp service. Off ("unset") until bought; setup in `infra/azure/README.md`.
+- Originals issued before the certificate is configured stay unsigned (an original never changes).
+- To confirm with a CPA: that this meets the "secure electronic signature" requirement for
+  computerised documents sent electronically, and that customers agree to receive them so.
 
 ### M7 implementation notes (for CPA review)
 

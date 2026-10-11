@@ -96,6 +96,21 @@ To scale an existing server down later (e.g. B2s to B1ms when capacity allows), 
 4. In the app, the owner opens Settings → רשות המסים → "התחברות לרשות המסים", signs in at the
    tax authority and approves the software.
 
+## Digital signature on PDFs (off until a certificate is bought)
+
+Issued documents' PDFs are signed when a certificate is configured. Buy an organisational
+signing certificate from an Israeli certificate authority (e.g. Comsign, Personal-ID) as a
+PKCS#12 (.p12/.pfx) file, upload it to Cloud Shell, and store it only in Key Vault:
+
+```bash
+az keyvault secret set --vault-name <vault> -n pdf-signing-p12 --value "$(base64 -w0 cert.p12)"
+az keyvault secret set --vault-name <vault> -n pdf-signing-password --value '<password>'
+rm cert.p12
+```
+
+Optionally add the authority's timestamp service to `AZURE_ENV` (`"pdfSigningTsaUrl": "https://..."`),
+then run Deploy.
+
 ## Useful commands (Cloud Shell)
 
 ```bash
