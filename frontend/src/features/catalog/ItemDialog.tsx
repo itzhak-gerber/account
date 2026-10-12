@@ -16,6 +16,8 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
+import { useSession } from "../../auth/context";
+import { hasModule } from "../../auth/plan";
 import type { Item, ItemInput } from "../../api/types";
 import { cleanAmount, finishAmount, isAmount } from "../../lib/amount";
 import { errorMessage } from "../../lib/errors";
@@ -51,6 +53,10 @@ export function ItemDialog({ businessId, item, open, onClose }: Props) {
   );
   const [touched, setTouched] = useState(false);
   const base = `/businesses/${businessId}/items`;
+  // Without the inventory module, stock tracking and kits cannot be turned on.
+  const lockStock = !hasModule(useSession().current, "inventory");
+  const wasTracked = item?.track_inventory ?? false;
+  const wasKit = item?.item_type === "kit";
 
   const save = useMutation({
     mutationFn: (input: ItemInput) =>
@@ -126,8 +132,10 @@ export function ItemDialog({ businessId, item, open, onClose }: Props) {
               {field("item_type", {
                 select: true,
                 children: (["service", "product", "kit"] as const).map((v) => (
-                  <MenuItem key={v} value={v}>
+                  // Kits belong to the inventory module (an existing kit stays editable).
+                  <MenuItem key={v} value={v} disabled={v === "kit" && lockStock && !wasKit}>
                     {t(`items.types.${v}`)}
+                    {v === "kit" && lockStock && !wasKit && ` (${t("nav.upgrade")})`}
                   </MenuItem>
                 )),
               })}
@@ -154,13 +162,18 @@ export function ItemDialog({ businessId, item, open, onClose }: Props) {
                   <FormControlLabel
                     control={
                       <Switch
+                        disabled={lockStock && !wasTracked}
                         checked={value.track_inventory}
                         onChange={(e) =>
                           setValue((v) => ({ ...v, track_inventory: e.target.checked }))
                         }
                       />
                     }
-                    label={t("items.track_inventory")}
+                    label={
+                      lockStock && !wasTracked
+                        ? `${t("items.track_inventory")} – ${t("plan.lockedHelp")}`
+                        : t("items.track_inventory")
+                    }
                   />
                 </Grid>
                 {value.track_inventory && (

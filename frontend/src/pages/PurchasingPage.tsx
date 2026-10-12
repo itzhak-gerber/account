@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 
 import { useSession } from "../auth/context";
+import { canChange } from "../auth/plan";
 import { can } from "../auth/permissions";
 import { InvoicesTab } from "../features/purchasing/InvoicesTab";
 import { OrdersTab } from "../features/purchasing/OrdersTab";
@@ -24,7 +25,7 @@ export function PurchasingPage() {
   const requested = params.get("tab") as TabKey | null;
   const tab: TabKey = requested && TABS.includes(requested) ? requested : "orders";
   const businessId = current!.business.id;
-  const canEdit = can(current?.role, "managePurchasing");
+  const canEdit = canChange(current, "managePurchasing");
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 1100 }}>

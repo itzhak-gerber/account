@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
 import { useSession } from "../../auth/context";
-import { can } from "../../auth/permissions";
+import { canChange } from "../../auth/plan";
 import { useDocumentTypes } from "./hooks";
 
 export function NewDocumentButton({ fullWidth }: { fullWidth?: boolean }) {
@@ -16,7 +16,7 @@ export function NewDocumentButton({ fullWidth }: { fullWidth?: boolean }) {
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const types = useDocumentTypes(current!.business.id);
-  if (!can(current?.role, "editDocuments")) return null;
+  if (!canChange(current, "editDocuments")) return null;
 
   return (
     <>

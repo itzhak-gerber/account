@@ -22,6 +22,9 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
+import { useSession } from "../../auth/context";
+import { hasModule } from "../../auth/plan";
+import { UpgradeButton } from "../plan/UpgradeNotice";
 import type { ScanResult, SupplierInvoice } from "../../api/types";
 import { errorMessage } from "../../lib/errors";
 import { formatDate, formatMoney } from "../../lib/money";
@@ -36,6 +39,7 @@ export function InvoicesTab({ businessId, canEdit }: { businessId: string; canEd
   const [editing, setEditing] = useState<SupplierInvoice | null | "new">(null);
   const [scanned, setScanned] = useState<ScanResult | null>(null);
   const camera = useRef<HTMLInputElement>(null);
+  const scanning = hasModule(useSession().current, "scanning");
   const files = useRef<HTMLInputElement>(null);
   const scan = useMutation({
     mutationFn: (file: File) =>
@@ -95,22 +99,28 @@ export function InvoicesTab({ businessId, canEdit }: { businessId: string; canEd
               accept="image/*,application/pdf"
               onChange={pick}
             />
-            <Button
-              variant="contained"
-              startIcon={<PhotoCameraOutlined />}
-              disabled={scan.isPending}
-              onClick={() => camera.current?.click()}
-            >
-              {scan.isPending ? t("scan.reading") : t("scan.photo")}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<UploadFileOutlined />}
-              disabled={scan.isPending}
-              onClick={() => files.current?.click()}
-            >
-              {t("scan.upload")}
-            </Button>
+            {scanning ? (
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={<PhotoCameraOutlined />}
+                  disabled={scan.isPending}
+                  onClick={() => camera.current?.click()}
+                >
+                  {scan.isPending ? t("scan.reading") : t("scan.photo")}
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadFileOutlined />}
+                  disabled={scan.isPending}
+                  onClick={() => files.current?.click()}
+                >
+                  {t("scan.upload")}
+                </Button>
+              </>
+            ) : (
+              <UpgradeButton module="scanning" label={t("scan.photo")} />
+            )}
             <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
               {t("supplierInvoices.new")}
             </Button>

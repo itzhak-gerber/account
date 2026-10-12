@@ -20,9 +20,10 @@ import { Link as RouterLink } from "react-router";
 import { api } from "../api/client";
 import type { Item, Stock, StockItem } from "../api/types";
 import { useSession } from "../auth/context";
-import { can } from "../auth/permissions";
+import { canChange, hasModule } from "../auth/plan";
 import { AdjustDialog } from "../features/inventory/AdjustDialog";
 import { MovementsDialog } from "../features/inventory/MovementsDialog";
+import { UpgradeNotice } from "../features/plan/UpgradeNotice";
 import { formatMoney } from "../lib/money";
 
 const qty = (value: string | number) => Number(value).toLocaleString("he-IL");
@@ -41,7 +42,8 @@ export function InventoryPage() {
   const { t } = useTranslation();
   const { current } = useSession();
   const businessId = current!.business.id;
-  const canAdjust = can(current?.role, "manageCatalog");
+  const included = hasModule(current, "inventory");
+  const canAdjust = canChange(current, "manageCatalog") && included;
   const stock = useQuery({
     queryKey: ["business", businessId, "inventory"],
     queryFn: () => api.get<Stock>(`/businesses/${businessId}/inventory`),
@@ -60,7 +62,8 @@ export function InventoryPage() {
           {t("inventory.lowAlert", { names: low.map((r) => r.item.name).join(", ") })}
         </Alert>
       )}
-      {stock.data && stock.data.items.length === 0 && stock.data.kits.length === 0 && (
+      {!included && <UpgradeNotice module="inventory" />}
+      {included && stock.data && stock.data.items.length === 0 && stock.data.kits.length === 0 && (
         <Alert severity="info">
           {t("inventory.empty")}{" "}
           <Button component={RouterLink} to="/items" size="small">

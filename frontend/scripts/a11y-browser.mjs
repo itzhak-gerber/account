@@ -9,7 +9,7 @@ import { createRequire } from "node:module";
 
 import { chromium } from "playwright";
 
-import { fixtureBody, ME } from "../src/test/apiFixtures.ts";
+import { fixtureBody, ME, meWithPlan } from "../src/test/apiFixtures.ts";
 
 const require = createRequire(import.meta.url);
 const AXE = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
@@ -37,6 +37,15 @@ const SCREENS = [
   ["data export", "/settings?tab=export"],
   ["tax authority", "/settings?tab=ita"],
   ["profile", "/profile"],
+  ["my plan", "/settings?tab=plan"],
+  ["inventory without the module", "/inventory", meWithPlan([])],
+  ["supplier invoices without scanning", "/purchasing?tab=invoices", meWithPlan(["inventory"])],
+  ["read-only business", "/documents", meWithPlan([], true)],
+  ["admin: businesses", "/admin"],
+  ["admin: plans", "/admin?tab=plans"],
+  ["admin: new business", "/admin?tab=settings"],
+  ["admin: indexes", "/admin?tab=indexes"],
+  ["admin: billing", "/admin?tab=billing"],
   ["accessibility statement", "/accessibility"],
   ["onboarding", "/", { ...ME, memberships: [] }],
   ["two-factor required", "/", { ...ME, memberships: [], mfa: false }],

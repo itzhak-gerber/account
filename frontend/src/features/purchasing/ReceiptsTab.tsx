@@ -18,6 +18,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
+import { useSession } from "../../auth/context";
+import { hasModule } from "../../auth/plan";
+import { UpgradeNotice } from "../plan/UpgradeNotice";
 import type { GoodsReceipt } from "../../api/types";
 import { formatDate, formatMoney } from "../../lib/money";
 import { ReceiptDialog } from "./ReceiptDialog";
@@ -33,9 +36,12 @@ export function ReceiptsTab({ businessId, canEdit }: { businessId: string; canEd
     queryFn: () => api.get<GoodsReceipt[]>(`/businesses/${businessId}/goods-receipts`),
   });
 
+  const included = hasModule(useSession().current, "inventory");
+
   return (
     <Stack spacing={2}>
-      {canEdit && (
+      {!included && <UpgradeNotice module="inventory" />}
+      {canEdit && included && (
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={2}

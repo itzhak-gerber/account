@@ -29,7 +29,7 @@ import type {
   PaymentInput,
 } from "../../api/types";
 import { useSession } from "../../auth/context";
-import { can } from "../../auth/permissions";
+import { canChange } from "../../auth/plan";
 import { errorMessage } from "../../lib/errors";
 import { formatDate, formatMoney, previewTotals } from "../../lib/money";
 import { AllocationsEditor } from "./AllocationsEditor";
@@ -254,7 +254,7 @@ export function DocumentEditor({ businessId, type, info, document, payInvoice }:
 
   const error = (allocationProblem ? null : issue.error) ?? save.error ?? remove.error;
   const busy = save.isPending || issue.isPending;
-  const canEdit = can(current?.role, "editDocuments");
+  const canEdit = canChange(current, "editDocuments");
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 1100 }}>
@@ -282,7 +282,7 @@ export function DocumentEditor({ businessId, type, info, document, payInvoice }:
                 businessId={businessId}
                 customerId={state.customer_id}
                 details={state.customer}
-                canSaveCustomer={can(current?.role, "manageCatalog")}
+                canSaveCustomer={canChange(current, "manageCatalog")}
                 onChange={(customer_id, customer) =>
                   setState((s) => ({ ...s, customer_id, customer }))
                 }

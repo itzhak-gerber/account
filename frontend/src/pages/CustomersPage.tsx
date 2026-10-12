@@ -18,7 +18,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { Customer } from "../api/types";
 import { useSession } from "../auth/context";
-import { can } from "../auth/permissions";
+import { canChange } from "../auth/plan";
 import { CustomerDialog } from "../features/catalog/CustomerDialog";
 
 export function CustomersPage() {
@@ -28,7 +28,7 @@ export function CustomersPage() {
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search);
   const [editing, setEditing] = useState<Customer | null | "new">(null);
-  const canEdit = can(current?.role, "manageCatalog");
+  const canEdit = canChange(current, "manageCatalog");
 
   const customers = useQuery({
     queryKey: ["business", businessId, "customers", q],

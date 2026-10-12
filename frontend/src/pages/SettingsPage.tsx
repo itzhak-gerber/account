@@ -20,10 +20,11 @@ import { BusinessForm } from "../features/settings/BusinessForm";
 import { ItaTab } from "../features/settings/ItaTab";
 import { LogoCard } from "../features/settings/LogoCard";
 import { NumberingTab } from "../features/settings/NumberingTab";
+import { PlanTab } from "../features/settings/PlanTab";
 import { TeamTab } from "../features/settings/TeamTab";
 import { errorMessage } from "../lib/errors";
 
-type TabKey = "details" | "team" | "numbering" | "ita" | "audit" | "export";
+type TabKey = "details" | "plan" | "team" | "numbering" | "ita" | "audit" | "export";
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -43,7 +44,7 @@ export function SettingsPage() {
 
   if (!current) return null;
   const { business, role } = current;
-  const tabs: TabKey[] = ["details"];
+  const tabs: TabKey[] = ["details", "plan"];
   if (can(role, "viewMembers")) tabs.push("team");
   tabs.push("numbering");
   if (can(role, "manageBusiness")) tabs.push("ita");
@@ -99,6 +100,9 @@ export function SettingsPage() {
             />
           </CardContent>
         </Card>
+      )}
+      {tab === "plan" && (
+        <PlanTab businessId={business.id} canRequest={can(role, "manageBusiness")} />
       )}
       {tab === "team" && <TeamTab businessId={business.id} role={role} />}
       {tab === "ita" && <ItaTab businessId={business.id} canManage={can(role, "manageBusiness")} />}

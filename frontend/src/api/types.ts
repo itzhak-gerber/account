@@ -27,15 +27,26 @@ export interface Business {
   has_logo: boolean;
 }
 
+export type ModuleName = "inventory" | "scanning";
+
+/** What the business's current plan allows (absent: everything, as before plans). */
+export interface PlanSummary {
+  read_only: boolean;
+  modules: ModuleName[];
+  ends_on: string | null;
+}
+
 export interface Membership {
   business: Business;
   role: Role;
+  plan?: PlanSummary | null;
 }
 
 export interface Me {
   user: User;
   memberships: Membership[];
   mfa: boolean;
+  is_operator?: boolean;
   csrf_token: string | null;
 }
 
@@ -583,4 +594,111 @@ export interface Device {
   first_seen_at: string;
   last_seen_at: string;
   current: boolean;
+}
+
+// --- plans and billing -------------------------------------------------------------------
+
+export type Linkage = "none" | "cpi" | "usd";
+export type SubscriptionKind = "trial" | "paid" | "unlimited";
+
+export interface PlanInput {
+  name: string;
+  description: string;
+  modules: ModuleName[];
+  duration_months: number;
+  price: string;
+  linkage: Linkage;
+  base_index: string | null;
+  documents_per_month: number | null;
+  document_overage_price: string | null;
+  scans_per_month: number | null;
+  scan_overage_price: string | null;
+  is_active: boolean;
+}
+
+export interface Plan extends PlanInput {
+  id: string;
+  current_price: string | null;
+}
+
+export interface Usage {
+  used: number;
+  quota: number | null;
+  over: number;
+  over_amount: string;
+}
+
+export interface PlanStatus {
+  read_only: boolean;
+  kind: SubscriptionKind | null;
+  name: string | null;
+  modules: ModuleName[];
+  starts_on: string | null;
+  ends_on: string | null;
+  document_overage_price: string | null;
+  scan_overage_price: string | null;
+  documents: Usage;
+  scans: Usage;
+  available_plans: Plan[];
+}
+
+export interface BillingSettings {
+  trial_plan_id: string | null;
+  trial_days: number;
+  new_business_discount_percent: string;
+  new_business_discount_periods: number;
+}
+
+export interface IndexValue {
+  id: string;
+  kind: "cpi" | "usd";
+  period: string;
+  value: string;
+}
+
+export interface AdminBusiness {
+  id: string;
+  display_name: string;
+  legal_name: string;
+  tax_id: string;
+  created_at: string;
+  owner_email: string | null;
+  subscription_id: string | null;
+  kind: SubscriptionKind | null;
+  plan_name: string | null;
+  ends_on: string | null;
+  documents_this_month: number;
+  scans_this_month: number;
+}
+
+export interface Subscription {
+  id: string;
+  plan_id: string | null;
+  kind: SubscriptionKind;
+  terms: Record<string, unknown> & { name?: string };
+  starts_on: string;
+  ends_on: string | null;
+  price: string;
+  discount_percent: string;
+  notes: string;
+  created_at: string;
+}
+
+export interface BillingRow {
+  business_id: string;
+  business_name: string;
+  tax_id: string;
+  plan_charges: string;
+  plan_names: string[];
+  documents_over: number;
+  documents_over_amount: string;
+  scans_over: number;
+  scans_over_amount: string;
+  total: string;
+}
+
+export interface BillingReport {
+  month: string;
+  rows: BillingRow[];
+  total: string;
 }

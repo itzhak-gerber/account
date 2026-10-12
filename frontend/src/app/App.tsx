@@ -7,6 +7,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router";
 import { useMeQuery } from "../auth/useMe";
 import { SessionProvider } from "../auth/session";
 import { AccessibilityPage } from "../pages/AccessibilityPage";
+import { AdminPage } from "../pages/AdminPage";
 import { CustomersPage } from "../pages/CustomersPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { DocumentPage } from "../pages/DocumentPage";
@@ -58,6 +59,7 @@ function AuthenticatedRoutes() {
         <Route element={<AppShell />}>
           <Route path="/invite" element={<InvitePage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/admin" element={<AdminPage />} />
           {hasBusiness ? (
             <>
               <Route index element={<DashboardPage />} />

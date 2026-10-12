@@ -17,7 +17,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { Item } from "../api/types";
 import { useSession } from "../auth/context";
-import { can } from "../auth/permissions";
+import { canChange } from "../auth/plan";
 import { ItemDialog } from "../features/catalog/ItemDialog";
 import { formatMoney } from "../lib/money";
 
@@ -28,7 +28,7 @@ export function ItemsPage() {
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search);
   const [editing, setEditing] = useState<Item | null | "new">(null);
-  const canEdit = can(current?.role, "manageCatalog");
+  const canEdit = canChange(current, "manageCatalog");
 
   const items = useQuery({
     queryKey: ["business", businessId, "items", q],

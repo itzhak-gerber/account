@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import type { DocumentStatus, DocumentSummary, DocumentType } from "../api/types";
 import { useSession } from "../auth/context";
-import { can } from "../auth/permissions";
+import { canChange } from "../auth/plan";
 import { DocumentList } from "../features/documents/DocumentList";
 import { InvoiceDeliveryNotesDialog } from "../features/documents/InvoiceDeliveryNotesDialog";
 import { NewDocumentButton } from "../features/documents/NewDocumentButton";
@@ -28,7 +28,7 @@ export function DocumentsPage() {
   const [type, setType] = useState<DocumentType | "">("");
   const [status, setStatus] = useState<DocumentStatus | "" | "unpaid" | "uninvoiced">("");
   const [consolidating, setConsolidating] = useState(false);
-  const canEdit = can(current?.role, "editDocuments");
+  const canEdit = canChange(current, "editDocuments");
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search);
 

@@ -20,6 +20,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../../api/client";
+import { useSession } from "../../auth/context";
+import { hasModule } from "../../auth/plan";
 import type { OrderStatus, PurchaseOrder } from "../../api/types";
 import { errorMessage } from "../../lib/errors";
 import { formatDate, formatMoney } from "../../lib/money";
@@ -35,6 +37,8 @@ const STATUS_COLOR: Record<OrderStatus, "info" | "warning" | "success" | "defaul
 const qty = (value: string) => Number(value).toLocaleString("he-IL");
 
 export function OrdersTab({ businessId, canEdit }: { businessId: string; canEdit: boolean }) {
+  // Receiving goods into stock is part of the inventory module.
+  const receives = hasModule(useSession().current, "inventory");
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<PurchaseOrder | null | "new">(null);
@@ -180,7 +184,7 @@ export function OrdersTab({ businessId, canEdit }: { businessId: string; canEdit
                 {t("orders.edit")}
               </Button>
             )}
-            {canEdit && active(viewing) && (
+            {canEdit && active(viewing) && receives && (
               <Button
                 variant="contained"
                 onClick={() => {

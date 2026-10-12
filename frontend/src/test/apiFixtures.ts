@@ -23,9 +23,66 @@ const USER = {
 };
 export const ME = {
   user: USER,
-  memberships: [{ business: BUSINESS, role: "owner" }],
+  memberships: [
+    {
+      business: BUSINESS,
+      role: "owner",
+      plan: { read_only: false, modules: ["inventory", "scanning"], ends_on: "2027-10-01" },
+    },
+  ],
   mfa: true,
+  is_operator: true,
   csrf_token: "csrf",
+};
+
+/** The same user in a business whose plan has only the base, or has ended. */
+export function meWithPlan(modules: string[], readOnly = false) {
+  return {
+    ...ME,
+    memberships: [{ ...ME.memberships[0], plan: { read_only: readOnly, modules, ends_on: null } }],
+  };
+}
+
+const PLAN = {
+  id: "p1",
+  name: "עסקי",
+  description: "מסמכים ומלאי",
+  modules: ["inventory"],
+  duration_months: 12,
+  price: "1200.00",
+  current_price: "1230.00",
+  linkage: "cpi",
+  base_index: "100.0000",
+  documents_per_month: 100,
+  document_overage_price: "3.00",
+  scans_per_month: null,
+  scan_overage_price: null,
+  is_active: true,
+};
+
+const PLAN_STATUS = {
+  read_only: false,
+  kind: "paid",
+  name: "עסקי",
+  modules: ["inventory"],
+  starts_on: "2026-10-01",
+  ends_on: "2027-10-01",
+  document_overage_price: "3.00",
+  scan_overage_price: null,
+  documents: { used: 82, quota: 100, over: 0, over_amount: "0.00" },
+  scans: { used: 0, quota: null, over: 0, over_amount: "0.00" },
+  available_plans: [
+    PLAN,
+    {
+      ...PLAN,
+      id: "p2",
+      name: "פרימיום",
+      modules: ["inventory", "scanning"],
+      price: "2400.00",
+      current_price: "2460.00",
+      scans_per_month: 50,
+    },
+  ],
 };
 const CUSTOMER = {
   id: "c1",
@@ -314,6 +371,61 @@ export function fixtureBody(url: string, me: unknown = ME): unknown {
   const path = url.replace(/^\/api\/v1/, "").split("?")[0];
   const routes: [RegExp, unknown][] = [
     [/^\/me$/, me],
+    [/^\/businesses\/[^/]+\/plan$/, PLAN_STATUS],
+    [/^\/admin\/plans$/, PLAN_STATUS.available_plans],
+    [
+      /^\/admin\/businesses$/,
+      [
+        {
+          id: "b1",
+          display_name: "סטודיו אורן",
+          legal_name: "סטודיו אורן בע״מ",
+          tax_id: "516179157",
+          created_at: "2026-10-01T10:00:00Z",
+          owner_email: "owner@example.com",
+          subscription_id: "s1",
+          kind: "paid",
+          plan_name: "עסקי",
+          ends_on: "2027-10-01",
+          documents_this_month: 82,
+          scans_this_month: 0,
+        },
+      ],
+    ],
+    [
+      /^\/admin\/settings$/,
+      {
+        trial_plan_id: "p1",
+        trial_days: 30,
+        new_business_discount_percent: "50.00",
+        new_business_discount_periods: 1,
+      },
+    ],
+    [
+      /^\/admin\/index-values$/,
+      [{ id: "i1", kind: "cpi", period: "2026-09-01", value: "102.5000" }],
+    ],
+    [
+      /^\/admin\/billing$/,
+      {
+        month: "2026-10-01",
+        rows: [
+          {
+            business_id: "b1",
+            business_name: "סטודיו אורן",
+            tax_id: "516179157",
+            plan_charges: "1230.00",
+            plan_names: ["עסקי"],
+            documents_over: 2,
+            documents_over_amount: "6.00",
+            scans_over: 0,
+            scans_over_amount: "0.00",
+            total: "1236.00",
+          },
+        ],
+        total: "1236.00",
+      },
+    ],
     [/^\/health$/, { status: "ok", version: "0.1.0", environment: "dev", database: "ok" }],
     [
       /^\/me\/devices$/,

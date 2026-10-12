@@ -8,12 +8,16 @@ import SettingsOutlined from "@mui/icons-material/SettingsOutlined";
 import SpaceDashboardOutlined from "@mui/icons-material/SpaceDashboardOutlined";
 import type { ReactElement } from "react";
 
+import type { ModuleName } from "../api/types";
+
 export interface NavItem {
   path: string;
   labelKey: string;
   icon: ReactElement;
   /** Shown in the mobile bottom bar (the rest live under "more"). */
   primary: boolean;
+  /** Part of a paid module: still listed, with an "upgrade" tag, when the plan lacks it. */
+  module?: ModuleName;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -21,7 +25,13 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "/documents", labelKey: "nav.documents", icon: <ReceiptLongOutlined />, primary: true },
   { path: "/customers", labelKey: "nav.customers", icon: <PeopleOutlined />, primary: true },
   { path: "/items", labelKey: "nav.items", icon: <Inventory2Outlined />, primary: false },
-  { path: "/inventory", labelKey: "nav.inventory", icon: <WarehouseOutlined />, primary: false },
+  {
+    path: "/inventory",
+    labelKey: "nav.inventory",
+    icon: <WarehouseOutlined />,
+    primary: false,
+    module: "inventory",
+  },
   {
     path: "/purchasing",
     labelKey: "nav.purchasing",

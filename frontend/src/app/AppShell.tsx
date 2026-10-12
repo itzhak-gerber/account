@@ -1,10 +1,14 @@
 import AccountCircleOutlined from "@mui/icons-material/AccountCircleOutlined";
+import AdminPanelSettingsOutlined from "@mui/icons-material/AdminPanelSettingsOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import Alert from "@mui/material/Alert";
 import AppBar from "@mui/material/AppBar";
 import BottomNavigation from "@mui/material/BottomNavigation";
 import BottomNavigationAction from "@mui/material/BottomNavigationAction";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
 import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
 import Link from "@mui/material/Link";
@@ -27,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from "react-router";
 
 import { useSession } from "../auth/context";
+import { hasModule, isReadOnly } from "../auth/plan";
 import { NotificationBell } from "../features/notifications/NotificationBell";
 import { MfaRequiredPage } from "../pages/MfaRequiredPage";
 import { NAV_ITEMS } from "./navigation";
@@ -68,9 +73,29 @@ export function AppShell() {
           >
             <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
             <ListItemText primary={t(item.labelKey)} />
+            {item.module && !hasModule(current, item.module) && (
+              <Chip size="small" variant="outlined" label={t("nav.upgrade")} />
+            )}
           </ListItemButton>
         </ListItem>
       ))}
+      {me.is_operator && (
+        <ListItem disablePadding>
+          <ListItemButton
+            component={RouterLink}
+            to="/admin"
+            selected={location.pathname === "/admin"}
+            aria-current={location.pathname === "/admin" ? "page" : undefined}
+            onClick={() => setMobileMenuOpen(false)}
+            sx={{ mx: 1, borderRadius: 2 }}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <AdminPanelSettingsOutlined />
+            </ListItemIcon>
+            <ListItemText primary={t("nav.admin")} />
+          </ListItemButton>
+        </ListItem>
+      )}
     </List>
   );
 
@@ -248,6 +273,19 @@ export function AppShell() {
         }}
       >
         <Toolbar />
+        {isReadOnly(current) && !mfaWall && (
+          <Alert
+            severity="warning"
+            sx={{ mb: 3 }}
+            action={
+              <Button color="inherit" size="small" component={RouterLink} to="/settings?tab=plan">
+                {t("plan.toPlan")}
+              </Button>
+            }
+          >
+            <strong>{t("plan.readOnlyTitle")}.</strong> {t("plan.readOnlyBody")}
+          </Alert>
+        )}
         {mfaWall && location.pathname !== "/profile" ? <MfaRequiredPage /> : <Outlet />}
       </Box>
 

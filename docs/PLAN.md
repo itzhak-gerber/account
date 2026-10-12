@@ -633,6 +633,35 @@ long-term (7-year) database backups (see data protection below).
 - Not yet: discarding the paper. That needs the tax authority's scanning rules (software
   registered for scanning, signed at scan time); confirm with a CPA during registration.
 
+### Plans, modules and billing
+
+- **Modules.** The base (always) covers every document type, including delivery notes and
+  the consolidated invoice, customers, items, purchase orders, suppliers, supplier invoices
+  typed by hand, reports, exports and allocation numbers. *Inventory* adds stock tracking,
+  kits, goods receipts, stock counts and low-stock alerts. *Scanning* adds photographed or
+  uploaded supplier invoices read automatically.
+- **Plans** (operator): modules, length in months, price for the period (before VAT),
+  optional linkage (CPI by month, dollar by day: price × latest value ÷ value at quoting),
+  monthly quotas of documents and scans, and overage prices (no scan overage price: scans
+  stop at the quota). Plans are never deleted; changes apply to new purchases only.
+- **Subscriptions.** Selling a plan copies its terms and fixes its price (linkage and
+  discount applied) for the whole period; a renewal starts when the paid period ends. A new
+  business gets the trial plan for N days; the first N paid periods of a business can carry
+  a discount. Businesses from before plans have an unlimited subscription.
+- **Read-only.** Without a current subscription a business can view, download PDFs, export
+  (including the uniform format), manage members and business details, send issued
+  documents and ask again for an allocation number; it cannot create or change data.
+- **Usage.** Each issued document (not quotes) and each scan is recorded per calendar month
+  (Israel time) with its overage price when past the quota. Managers are notified at 80% and
+  100% of a quota, and 14 days, 3 days and on the day the plan ends.
+- **Enforcement** is on the server for every channel (web, MCP); the app shows locked modules
+  with an "upgrade" tag and an explanation, and a read-only banner. Businesses ask to
+  upgrade from "התוכנית שלי"; operators get an email.
+- **Operators** are sign-in emails in `APP_OPERATOR_EMAILS` (two-factor required). The
+  `/admin` screen: businesses (plan, usage; sell or end a plan), plans, new-business trial
+  and discount, index values, and the monthly billing report (Excel) used to invoice
+  customers. Payment collection (a clearing company) is a later step.
+
 ### M7 implementation notes (for CPA review)
 
 - Reports read the totals stored on issued documents; drafts are never included. Amounts are ILS.
