@@ -40,7 +40,7 @@ async def record(
 async def list_entries(
     session: AsyncSession, ctx: BusinessContext, *, limit: int = 50, before: uuid.UUID | None = None
 ) -> list[AuditLog]:
-    require(ctx.role, Permission.VIEW_AUDIT_LOG)
+    require(ctx, Permission.VIEW_AUDIT_LOG)
     query = select(AuditLog).where(AuditLog.business_id == ctx.business_id)
     if before is not None:
         cursor = await session.get(AuditLog, before)

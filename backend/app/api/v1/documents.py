@@ -196,7 +196,7 @@ async def document_pdf(
 
 @router.get("/numbering")
 async def get_numbering(ctx: CurrentBusiness, session: DbSession) -> NumberingOut:
-    require(ctx.role, Permission.VIEW_DOCUMENTS)
+    require(ctx, Permission.VIEW_DOCUMENTS)
     return NumberingOut(next_numbers=await numbering.peek(session, ctx.business_id))
 
 
@@ -204,7 +204,7 @@ async def get_numbering(ctx: CurrentBusiness, session: DbSession) -> NumberingOu
 async def set_numbering(
     ctx: CurrentBusiness, data: NumberingIn, session: DbSession
 ) -> NumberingOut:
-    require(ctx.role, Permission.MANAGE_BUSINESS)
+    require(ctx, Permission.MANAGE_BUSINESS)
     await numbering.set_start(session, ctx.business_id, data.type, data.next_number)
     await audit.record(
         session,

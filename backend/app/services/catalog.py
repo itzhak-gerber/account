@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import BusinessContext
 from app.core.errors import AppError, NotFound
-from app.models import Customer, Item, ItemComponent, ItemType
+from app.models import Customer, Item, ItemComponent, ItemType, Module
 from app.schemas.catalog import ComponentIn, CustomerIn, CustomerPatch, ItemIn, ItemPatch
 from app.services import audit
 from app.services.permissions import Permission, require
@@ -47,7 +47,7 @@ async def list_customers(
     limit: int = 50,
     offset: int = 0,
 ) -> list[Customer]:
-    require(ctx.role, Permission.VIEW_CATALOG)
+    require(ctx, Permission.VIEW_CATALOG)
     query = select(Customer).where(Customer.business_id == ctx.business_id)
     if not include_archived:
         query = query.where(Customer.is_archived.is_(False))
@@ -58,7 +58,7 @@ async def list_customers(
 async def get_customer(
     session: AsyncSession, ctx: BusinessContext, customer_id: uuid.UUID
 ) -> Customer:
-    require(ctx.role, Permission.VIEW_CATALOG)
+    require(ctx, Permission.VIEW_CATALOG)
     customer = await session.get(Customer, customer_id)
     if customer is None or customer.business_id != ctx.business_id:
         raise NotFound("Customer not found", code="customer_not_found")
@@ -68,7 +68,7 @@ async def get_customer(
 async def create_customer(
     session: AsyncSession, ctx: BusinessContext, data: CustomerIn
 ) -> Customer:
-    require(ctx.role, Permission.MANAGE_CATALOG)
+    require(ctx, Permission.MANAGE_CATALOG)
     values = data.model_dump()
     values["email"] = values["email"] or ""
     customer = Customer(business_id=ctx.business_id, is_archived=False, **values)
@@ -89,7 +89,7 @@ async def create_customer(
 async def update_customer(
     session: AsyncSession, ctx: BusinessContext, customer_id: uuid.UUID, patch: CustomerPatch
 ) -> Customer:
-    require(ctx.role, Permission.MANAGE_CATALOG)
+    require(ctx, Permission.MANAGE_CATALOG)
     customer = await get_customer(session, ctx, customer_id)
     changes = await _apply_patch(customer, patch)
     if changes:
@@ -119,7 +119,7 @@ async def list_items(
     limit: int = 50,
     offset: int = 0,
 ) -> list[Item]:
-    require(ctx.role, Permission.VIEW_CATALOG)
+    require(ctx, Permission.VIEW_CATALOG)
     query = select(Item).where(Item.business_id == ctx.business_id)
     if not include_archived:
         query = query.where(Item.is_archived.is_(False))
@@ -128,7 +128,7 @@ async def list_items(
 
 
 async def get_item(session: AsyncSession, ctx: BusinessContext, item_id: uuid.UUID) -> Item:
-    require(ctx.role, Permission.VIEW_CATALOG)
+    require(ctx, Permission.VIEW_CATALOG)
     item = await session.get(Item, item_id)
     if item is None or item.business_id != ctx.business_id:
         raise NotFound("Item not found", code="item_not_found")
@@ -184,14 +184,22 @@ def _normalise_stock_fields(item: Item) -> None:
         item.min_stock = None
 
 
+def _require_inventory_for(ctx: BusinessContext, item: Item, *, was: tuple[bool, bool]) -> None:
+    """Turning on stock tracking, or making a kit, is part of the inventory module."""
+    tracked, kit = item.track_inventory, item.item_type == ItemType.KIT
+    if (tracked and not was[0]) or (kit and not was[1]):
+        ctx.access.require(Module.INVENTORY)
+
+
 async def create_item(session: AsyncSession, ctx: BusinessContext, data: ItemIn) -> Item:
-    require(ctx.role, Permission.MANAGE_CATALOG)
+    require(ctx, Permission.MANAGE_CATALOG)
     item = Item(
         business_id=ctx.business_id,
         is_archived=False,
         **data.model_dump(exclude={"components"}),
     )
     _normalise_stock_fields(item)
+    _require_inventory_for(ctx, item, was=(False, False))
     # Before the item joins the session, so setting the collection loads nothing.
     await _set_components(session, ctx, item, data.components)
     session.add(item)
@@ -213,9 +221,10 @@ async def create_item(session: AsyncSession, ctx: BusinessContext, data: ItemIn)
 async def update_item(
     session: AsyncSession, ctx: BusinessContext, item_id: uuid.UUID, patch: ItemPatch
 ) -> Item:
-    require(ctx.role, Permission.MANAGE_CATALOG)
+    require(ctx, Permission.MANAGE_CATALOG)
     item = await get_item(session, ctx, item_id)
     was_kit = item.item_type == ItemType.KIT
+    was_tracked = item.track_inventory
     changes = await _apply_patch(item, patch.model_copy(update={"components": None}))
     if "min_stock" in patch.model_fields_set and patch.min_stock is None and item.min_stock:
         changes["min_stock"] = {"from": str(item.min_stock), "to": ""}
@@ -227,6 +236,7 @@ async def update_item(
         if used:
             raise InvalidItem("This item is part of a kit", code="kit_in_kit")
     _normalise_stock_fields(item)
+    _require_inventory_for(ctx, item, was=(was_tracked, was_kit))
     if patch.components is not None or item.item_type != ItemType.KIT:
         if patch.components is not None or item.components:
             await _set_components(session, ctx, item, patch.components or [])

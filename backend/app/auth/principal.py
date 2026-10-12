@@ -16,6 +16,8 @@ from app.core.db import get_session, set_rls_context
 from app.core.errors import Forbidden, MfaRequired, NotAuthenticated, NotFound
 from app.core.redis import get_redis
 from app.models import BusinessMember, Role, User
+from app.services import billing
+from app.services.access import Access
 from app.services.permissions import MFA_REQUIRED_ROLES
 from app.services.users import upsert_from_claims
 
@@ -52,6 +54,7 @@ class BusinessContext:
     principal: Principal
     business_id: uuid.UUID
     role: Role
+    access: Access  # what the business's current plan allows
 
 
 def get_session_store() -> SessionStore:
@@ -143,7 +146,8 @@ async def enter_business(
     if role in MFA_REQUIRED_ROLES and get_settings().require_mfa_for_admins and not principal.mfa:
         raise MfaRequired("Two-factor authentication is required for this role")
     await set_rls_context(session, business_id=business_id)
-    return BusinessContext(principal=principal, business_id=business_id, role=role)
+    access = await billing.access_for(session, business_id)
+    return BusinessContext(principal=principal, business_id=business_id, role=role, access=access)
 
 
 async def get_business_context(

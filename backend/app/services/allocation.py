@@ -112,7 +112,7 @@ def _require_configured() -> None:
 
 
 async def status(session: AsyncSession, ctx: BusinessContext) -> dict[str, Any]:
-    require(ctx.role, Permission.VIEW_BUSINESS)
+    require(ctx, Permission.VIEW_BUSINESS)
     settings = get_settings()
     connection = await session.get(ItaConnection, ctx.business_id)
     return {
@@ -128,7 +128,7 @@ async def status(session: AsyncSession, ctx: BusinessContext) -> dict[str, Any]:
 
 def connect_url(ctx: BusinessContext) -> str:
     """Where to send the owner to approve this software at the tax authority."""
-    require(ctx.role, Permission.MANAGE_BUSINESS)
+    require(ctx, Permission.MANAGE_BUSINESS)
     _require_configured()
     state = signing.sign(
         {"b": str(ctx.business_id), "u": str(ctx.principal.user_id)},
@@ -146,7 +146,7 @@ def business_from_state(state: str, principal: Principal) -> uuid.UUID:
 
 
 async def finish_connect(session: AsyncSession, ctx: BusinessContext, code: str) -> None:
-    require(ctx.role, Permission.MANAGE_BUSINESS)
+    require(ctx, Permission.MANAGE_BUSINESS)
     _require_configured()
     try:
         tokens = await ita_client.exchange_code(code, redirect_uri())
@@ -178,7 +178,7 @@ async def finish_connect(session: AsyncSession, ctx: BusinessContext, code: str)
 
 
 async def disconnect(session: AsyncSession, ctx: BusinessContext) -> None:
-    require(ctx.role, Permission.MANAGE_BUSINESS)
+    require(ctx, Permission.MANAGE_BUSINESS)
     connection = await session.get(ItaConnection, ctx.business_id)
     if connection is not None:
         await session.delete(connection)
@@ -371,7 +371,8 @@ async def retry(session: AsyncSession, business_id: uuid.UUID, document_id: uuid
 
 
 async def retry_now(session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID) -> str:
-    require(ctx.role, Permission.ISSUE_DOCUMENTS)
+    # Completes a document already issued, so a read-only business can.
+    require(ctx, Permission.ISSUE_DOCUMENTS, while_read_only=True)
     _require_configured()
     return await retry(session, ctx.business_id, document_id)
 

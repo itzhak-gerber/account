@@ -28,10 +28,10 @@ from app.auth.principal import BusinessContext
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.storage import get_storage
-from app.models import StoredFile, Supplier
+from app.models import Module, StoredFile, Supplier, UsageKind
 from app.pdf import signing
 from app.schemas.identity import israeli_id_checksum_ok
-from app.services import audit
+from app.services import audit, billing
 from app.services.permissions import Permission, require
 
 log = structlog.get_logger()
@@ -245,7 +245,9 @@ async def _supplier(
 
 async def scan(session: AsyncSession, ctx: BusinessContext, data: bytes) -> dict[str, Any]:
     """Keep the file and suggest the invoice's fields."""
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
+    ctx.access.require(Module.SCANNING)
+    await billing.check_scan_allowed(session, ctx.business_id)
     prepared = prepare(data)
     try:
         pdf = await signing.sign(prepared.pdf)
@@ -262,6 +264,7 @@ async def scan(session: AsyncSession, ctx: BusinessContext, data: bytes) -> dict
     )
     session.add(file)
     await session.flush()
+    await billing.record_usage(session, ctx.business_id, UsageKind.SCAN, file.id)
 
     found = clean(await read_invoice(prepared.ai_block)) if ai_enabled() else {}
     supplier = await _supplier(session, ctx, found) if found else None

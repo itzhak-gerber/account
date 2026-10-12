@@ -47,7 +47,7 @@ def clean_logo(data: bytes) -> bytes:
 
 
 async def set_logo(session: AsyncSession, ctx: BusinessContext, data: bytes) -> Business:
-    require(ctx.role, Permission.MANAGE_BUSINESS)
+    require(ctx, Permission.MANAGE_BUSINESS)
     png = clean_logo(data)
     business = await session.get(Business, ctx.business_id)
     assert business is not None
@@ -76,7 +76,7 @@ async def set_logo(session: AsyncSession, ctx: BusinessContext, data: bytes) -> 
 
 
 async def remove_logo(session: AsyncSession, ctx: BusinessContext) -> None:
-    require(ctx.role, Permission.MANAGE_BUSINESS)
+    require(ctx, Permission.MANAGE_BUSINESS)
     business = await session.get(Business, ctx.business_id)
     assert business is not None
     if business.logo_file_id is not None:

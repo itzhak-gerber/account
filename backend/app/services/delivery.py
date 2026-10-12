@@ -43,7 +43,8 @@ async def defaults(
 async def send(
     session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID, request: EmailRequest
 ) -> DocumentDelivery:
-    require(ctx.role, Permission.ISSUE_DOCUMENTS)
+    # Sending a document already issued changes nothing, so a read-only business can.
+    require(ctx, Permission.ISSUE_DOCUMENTS, while_read_only=True)
     document = await documents.get_document(session, ctx, document_id)
     if document.status != DocumentStatus.ISSUED:
         raise Conflict("Only issued documents can be sent", code="document_not_issued")

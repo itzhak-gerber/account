@@ -2,6 +2,17 @@
 
 from app.models.audit import AuditLog
 from app.models.base import Base
+from app.models.billing import (
+    BillingSettings,
+    IndexValue,
+    Linkage,
+    Module,
+    Plan,
+    Subscription,
+    SubscriptionKind,
+    UsageEvent,
+    UsageKind,
+)
 from app.models.catalog import Customer, Item, ItemComponent, ItemType, VatType
 from app.models.documents import (
     DataExport,
@@ -55,6 +66,7 @@ __all__ = [
     "AllocationStatus",
     "AuditLog",
     "Base",
+    "BillingSettings",
     "Business",
     "BusinessMember",
     "BusinessType",
@@ -72,11 +84,14 @@ __all__ = [
     "ExportStatus",
     "GoodsReceipt",
     "GoodsReceiptLine",
+    "IndexValue",
     "Invitation",
     "ItaConnection",
     "Item",
     "ItemComponent",
     "ItemType",
+    "Linkage",
+    "Module",
     "MovementKind",
     "Notification",
     "NotificationEvent",
@@ -84,6 +99,7 @@ __all__ = [
     "OrderStatus",
     "OutboxEvent",
     "PaymentMethod",
+    "Plan",
     "PurchaseOrder",
     "PurchaseOrderLine",
     "PushSubscription",
@@ -92,10 +108,14 @@ __all__ = [
     "StockLevel",
     "StockMovement",
     "StoredFile",
+    "Subscription",
+    "SubscriptionKind",
     "Supplier",
     "SupplierInvoice",
     "TextSize",
     "ThemePreference",
+    "UsageEvent",
+    "UsageKind",
     "User",
     "UserDevice",
     "VatRate",

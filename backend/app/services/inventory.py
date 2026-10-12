@@ -28,6 +28,7 @@ from app.models import (
     DocumentType,
     Item,
     ItemType,
+    Module,
     MovementKind,
     RelationType,
     StockLevel,
@@ -82,8 +83,12 @@ async def move(
     goods_receipt_id: uuid.UUID | None = None,
     kit_item_id: uuid.UUID | None = None,
     reason: str = "",
+    alert: bool = True,
 ) -> StockMovement:
-    """Change one product's stock by ``quantity`` (+ in, - out) and record it."""
+    """Change one product's stock by ``quantity`` (+ in, - out) and record it.
+
+    ``alert``: tell the business when the item drops below its minimum (only with the
+    inventory module)."""
     level = await _lock_level(session, business_id, item.id)
     before = level.quantity
     after = before + quantity
@@ -110,7 +115,7 @@ async def move(
         created_by_user_id=user_id,
     )
     session.add(movement)
-    if item.min_stock is not None and before >= item.min_stock > after:
+    if alert and item.min_stock is not None and before >= item.min_stock > after:
         events.emit(
             session,
             business_id,
@@ -210,6 +215,7 @@ async def apply_document(
                 user_id=ctx.principal.user_id,
                 document_id=document.id,
                 kit_item_id=kit_id,
+                alert=ctx.access.has(Module.INVENTORY),
             )
         )
     return movements
@@ -226,7 +232,8 @@ async def adjust(
     reason: str,
 ) -> StockMovement:
     """A stock count (``counted``: the quantity on the shelf) or a correction (``change``)."""
-    require(ctx.role, Permission.MANAGE_CATALOG)
+    require(ctx, Permission.MANAGE_CATALOG)
+    ctx.access.require(Module.INVENTORY)
     item = await session.get(Item, item_id)
     if item is None or item.business_id != ctx.business_id:
         raise NotFound("Item not found", code="item_not_found")
@@ -317,7 +324,7 @@ async def stock_rows(session: AsyncSession, business_id: uuid.UUID) -> list[Stoc
 async def stock(session: AsyncSession, ctx: BusinessContext) -> dict[str, Any]:
     """Every stock-tracked product with its level and value, and every kit with how many can
     be put together from what is on hand."""
-    require(ctx.role, Permission.VIEW_CATALOG)
+    require(ctx, Permission.VIEW_CATALOG)
     items = await _tracked_and_kits(session, ctx.business_id)
     rows = await _rows(session, ctx.business_id, items)
     by_id = {r.item.id: r for r in rows}
@@ -345,7 +352,7 @@ async def stock(session: AsyncSession, ctx: BusinessContext) -> dict[str, Any]:
 async def movements(
     session: AsyncSession, ctx: BusinessContext, item_id: uuid.UUID, limit: int = 100
 ) -> list[StockMovement]:
-    require(ctx.role, Permission.VIEW_CATALOG)
+    require(ctx, Permission.VIEW_CATALOG)
     return list(
         await session.scalars(
             select(StockMovement)

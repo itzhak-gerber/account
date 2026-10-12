@@ -106,7 +106,7 @@ def _add_income(totals: IncomeTotals, row: IncomeDocument) -> None:
 async def income(
     session: AsyncSession, ctx: BusinessContext, date_from: date, date_to: date
 ) -> IncomeReport:
-    require(ctx.role, Permission.VIEW_REPORTS)
+    require(ctx, Permission.VIEW_REPORTS)
     return await income_for(session, ctx.business_id, date_from, date_to)
 
 
@@ -228,7 +228,7 @@ def _add_receipt(totals: ReceiptsTotals, row: ReceiptDocument) -> None:
 async def receipts(
     session: AsyncSession, ctx: BusinessContext, date_from: date, date_to: date
 ) -> ReceiptsReport:
-    require(ctx.role, Permission.VIEW_REPORTS)
+    require(ctx, Permission.VIEW_REPORTS)
     return await receipts_for(session, ctx.business_id, date_from, date_to)
 
 
@@ -309,7 +309,7 @@ def _add_open(totals: AgingTotals, row: OpenDocument) -> None:
 async def open_balances(
     session: AsyncSession, ctx: BusinessContext, as_of: date | None = None
 ) -> OpenBalancesReport:
-    require(ctx.role, Permission.VIEW_REPORTS)
+    require(ctx, Permission.VIEW_REPORTS)
     return await open_balances_for(session, ctx.business_id, as_of)
 
 
@@ -381,7 +381,7 @@ async def open_balances_for(
 
 
 async def dashboard(session: AsyncSession, ctx: BusinessContext) -> Dashboard:
-    require(ctx.role, Permission.VIEW_REPORTS)
+    require(ctx, Permission.VIEW_REPORTS)
     business = await session.get(Business, ctx.business_id)
     assert business is not None
     vat_registered = BusinessType(business.business_type) in VAT_REGISTERED

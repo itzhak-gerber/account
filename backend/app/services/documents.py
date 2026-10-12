@@ -25,6 +25,7 @@ from app.models import (
     DocumentType,
     RelationType,
     StoredFile,
+    UsageKind,
     User,
     VatType,
 )
@@ -49,6 +50,7 @@ from app.schemas.documents import (
 from app.services import allocation as allocation_numbers
 from app.services import (
     audit,
+    billing,
     branding,
     catalog,
     events,
@@ -418,7 +420,7 @@ async def to_out(session: AsyncSession, document: Document) -> DocumentOut:
 async def get_document(
     session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID
 ) -> Document:
-    require(ctx.role, Permission.VIEW_DOCUMENTS)
+    require(ctx, Permission.VIEW_DOCUMENTS)
     return await _load(session, ctx, document_id)
 
 
@@ -437,7 +439,7 @@ async def list_documents(
     limit: int = 50,
     offset: int = 0,
 ) -> list[DocumentSummary]:
-    require(ctx.role, Permission.VIEW_DOCUMENTS)
+    require(ctx, Permission.VIEW_DOCUMENTS)
     query = select(Document).where(Document.business_id == ctx.business_id)
     if doc_type:
         query = query.where(Document.type == doc_type)
@@ -495,7 +497,7 @@ async def list_documents(
 
 
 async def create_draft(session: AsyncSession, ctx: BusinessContext, data: DocumentIn) -> Document:
-    require(ctx.role, Permission.EDIT_DRAFTS)
+    require(ctx, Permission.EDIT_DRAFTS)
     business = await _business(session, ctx)
     if data.type == DocumentType.CREDIT_NOTE:
         raise InvalidDocument(
@@ -544,7 +546,7 @@ async def create_draft(session: AsyncSession, ctx: BusinessContext, data: Docume
 async def update_draft(
     session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID, patch: DocumentPatch
 ) -> Document:
-    require(ctx.role, Permission.EDIT_DRAFTS)
+    require(ctx, Permission.EDIT_DRAFTS)
     document = await _load(session, ctx, document_id, lock=True)
     _require_draft(document)
     business = await _business(session, ctx)
@@ -579,7 +581,7 @@ async def update_draft(
 
 
 async def delete_draft(session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID) -> None:
-    require(ctx.role, Permission.EDIT_DRAFTS)
+    require(ctx, Permission.EDIT_DRAFTS)
     document = await _load(session, ctx, document_id, lock=True)
     _require_draft(document)
     await session.delete(document)
@@ -665,7 +667,7 @@ async def _new_draft_from(
 async def convert(
     session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID, target: DocumentType
 ) -> Document:
-    require(ctx.role, Permission.EDIT_DRAFTS)
+    require(ctx, Permission.EDIT_DRAFTS)
     source = await _load(session, ctx, document_id)
     if source.status != DocumentStatus.ISSUED:
         raise Conflict("Only issued documents can be converted", code="document_not_issued")
@@ -688,7 +690,7 @@ async def invoice_delivery_notes(
     target: DocumentType,
 ) -> Document:
     """A draft invoice billing several delivery notes of one customer (חשבונית מרכזת)."""
-    require(ctx.role, Permission.EDIT_DRAFTS)
+    require(ctx, Permission.EDIT_DRAFTS)
     if target not in BILLS_DELIVERY_NOTES:
         raise InvalidDocument("This conversion is not supported", code="conversion_not_allowed")
     business = await _business(session, ctx)
@@ -716,7 +718,7 @@ async def invoice_delivery_notes(
 async def create_credit_note(
     session: AsyncSession, ctx: BusinessContext, invoice_id: uuid.UUID
 ) -> Document:
-    require(ctx.role, Permission.EDIT_DRAFTS)
+    require(ctx, Permission.EDIT_DRAFTS)
     invoice = await _load(session, ctx, invoice_id)
     if invoice.status != DocumentStatus.ISSUED or invoice.type not in CREDITABLE:
         raise InvalidDocument(
@@ -939,7 +941,7 @@ async def issue(
     A tax invoice that needs an allocation number gets it before the PDF is made; if the tax
     authority cannot give one, issuing stops unless ``without_allocation`` (then it is retried
     in the background)."""
-    require(ctx.role, Permission.ISSUE_DOCUMENTS)
+    require(ctx, Permission.ISSUE_DOCUMENTS)
     document = await _load(session, ctx, document_id, lock=True)
     _require_draft(document)
     business = await _business(session, ctx)
@@ -960,6 +962,8 @@ async def issue(
         session, ctx, business, document, allow_without=without_allocation
     )
     await inventory.apply_document(session, ctx, document)
+    if document.type not in billing.UNCOUNTED_DOCUMENTS:
+        await billing.record_usage(session, ctx.business_id, UsageKind.DOCUMENT, document.id)
 
     pdf = await render_pdf(
         document,
@@ -1016,7 +1020,7 @@ async def pdf(
     session: AsyncSession, ctx: BusinessContext, document_id: uuid.UUID
 ) -> tuple[bytes, str, Variant]:
     """Drafts: preview. Issued: the stored original the first time, then marked copies."""
-    require(ctx.role, Permission.VIEW_DOCUMENTS)
+    require(ctx, Permission.VIEW_DOCUMENTS)
     document = await _load(session, ctx, document_id, lock=True)
     name = f"{document.type}-{document.number or 'draft'}.pdf"
     if document.status == DocumentStatus.DRAFT:

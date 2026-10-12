@@ -74,7 +74,7 @@ async def request(
 ) -> dict[str, Any]:
     """Start an export. The date range applies to the uniform-format file; the PDFs and the
     workbook always hold everything."""
-    require(ctx.role, Permission.EXPORT_DATA)
+    require(ctx, Permission.EXPORT_DATA)
     if date_from and date_to and date_from > date_to:
         raise AppError("The range ends before it starts", code="invalid_date_range")
     running = await session.scalar(
@@ -116,7 +116,7 @@ async def request(
 
 
 async def list_exports(session: AsyncSession, ctx: BusinessContext) -> list[dict[str, Any]]:
-    require(ctx.role, Permission.EXPORT_DATA)
+    require(ctx, Permission.EXPORT_DATA)
     rows = await session.scalars(
         select(DataExport)
         .where(DataExport.business_id == ctx.business_id)
@@ -129,7 +129,7 @@ async def list_exports(session: AsyncSession, ctx: BusinessContext) -> list[dict
 async def download(
     session: AsyncSession, ctx: BusinessContext, export_id: uuid.UUID
 ) -> tuple[bytes, str]:
-    require(ctx.role, Permission.EXPORT_DATA)
+    require(ctx, Permission.EXPORT_DATA)
     export = await session.get(DataExport, export_id)
     if export is None or export.business_id != ctx.business_id:
         raise NotFound("Export not found", code="export_not_found")

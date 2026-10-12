@@ -23,6 +23,7 @@ from app.models import (
     GoodsReceiptLine,
     Item,
     ItemType,
+    Module,
     MovementKind,
     OrderStatus,
     PurchaseOrder,
@@ -93,7 +94,7 @@ async def list_suppliers(
     limit: int = 50,
     offset: int = 0,
 ) -> list[Supplier]:
-    require(ctx.role, Permission.VIEW_PURCHASING)
+    require(ctx, Permission.VIEW_PURCHASING)
     query = select(Supplier).where(Supplier.business_id == ctx.business_id)
     if not include_archived:
         query = query.where(Supplier.is_archived.is_(False))
@@ -113,7 +114,7 @@ async def list_suppliers(
 async def get_supplier(
     session: AsyncSession, ctx: BusinessContext, supplier_id: uuid.UUID
 ) -> Supplier:
-    require(ctx.role, Permission.VIEW_PURCHASING)
+    require(ctx, Permission.VIEW_PURCHASING)
     supplier = await session.get(Supplier, supplier_id)
     if supplier is None or supplier.business_id != ctx.business_id:
         raise NotFound("Supplier not found", code="supplier_not_found")
@@ -123,7 +124,7 @@ async def get_supplier(
 async def create_supplier(
     session: AsyncSession, ctx: BusinessContext, data: SupplierIn
 ) -> Supplier:
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
     values = data.model_dump()
     values["email"] = values["email"] or ""
     supplier = Supplier(business_id=ctx.business_id, is_archived=False, **values)
@@ -144,7 +145,7 @@ async def create_supplier(
 async def update_supplier(
     session: AsyncSession, ctx: BusinessContext, supplier_id: uuid.UUID, patch: SupplierPatch
 ) -> Supplier:
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
     supplier = await get_supplier(session, ctx, supplier_id)
     changes: dict[str, dict[str, str]] = {}
     for field, value in patch.model_dump(exclude_unset=True).items():
@@ -201,7 +202,7 @@ async def list_orders(
     supplier_id: uuid.UUID | None = None,
     limit: int = 100,
 ) -> list[PurchaseOrder]:
-    require(ctx.role, Permission.VIEW_PURCHASING)
+    require(ctx, Permission.VIEW_PURCHASING)
     query = select(PurchaseOrder).where(PurchaseOrder.business_id == ctx.business_id)
     if status:
         query = query.where(PurchaseOrder.status == status)
@@ -213,7 +214,7 @@ async def list_orders(
 async def get_order(
     session: AsyncSession, ctx: BusinessContext, order_id: uuid.UUID, *, lock: bool = False
 ) -> PurchaseOrder:
-    require(ctx.role, Permission.VIEW_PURCHASING)
+    require(ctx, Permission.VIEW_PURCHASING)
     query = select(PurchaseOrder).where(
         PurchaseOrder.id == order_id, PurchaseOrder.business_id == ctx.business_id
     )
@@ -226,7 +227,7 @@ async def get_order(
 
 
 async def create_order(session: AsyncSession, ctx: BusinessContext, data: OrderIn) -> PurchaseOrder:
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
     supplier = await get_supplier(session, ctx, data.supplier_id)
     order = PurchaseOrder(
         id=uuid.uuid4(),
@@ -258,7 +259,7 @@ async def create_order(session: AsyncSession, ctx: BusinessContext, data: OrderI
 async def update_order(
     session: AsyncSession, ctx: BusinessContext, order_id: uuid.UUID, patch: OrderPatch
 ) -> PurchaseOrder:
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
     order = await get_order(session, ctx, order_id, lock=True)
     if order.status != OrderStatus.OPEN:
         raise InvalidPurchase(
@@ -291,7 +292,7 @@ async def cancel_order(
     session: AsyncSession, ctx: BusinessContext, order_id: uuid.UUID
 ) -> PurchaseOrder:
     """Cancel what has not arrived yet (goods already received stay in stock)."""
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
     order = await get_order(session, ctx, order_id, lock=True)
     if order.status not in (OrderStatus.OPEN, OrderStatus.PARTIAL):
         raise InvalidPurchase("This order is already closed", code="purchase_order_closed")
@@ -318,7 +319,7 @@ async def list_receipts(
     purchase_order_id: uuid.UUID | None = None,
     limit: int = 100,
 ) -> list[GoodsReceipt]:
-    require(ctx.role, Permission.VIEW_PURCHASING)
+    require(ctx, Permission.VIEW_PURCHASING)
     query = select(GoodsReceipt).where(GoodsReceipt.business_id == ctx.business_id)
     if purchase_order_id:
         query = query.where(GoodsReceipt.purchase_order_id == purchase_order_id)
@@ -328,7 +329,7 @@ async def list_receipts(
 async def get_receipt(
     session: AsyncSession, ctx: BusinessContext, receipt_id: uuid.UUID
 ) -> GoodsReceipt:
-    require(ctx.role, Permission.VIEW_PURCHASING)
+    require(ctx, Permission.VIEW_PURCHASING)
     receipt = await session.get(GoodsReceipt, receipt_id)
     if receipt is None or receipt.business_id != ctx.business_id:
         raise NotFound("Goods receipt not found", code="goods_receipt_not_found")
@@ -339,7 +340,8 @@ async def create_receipt(
     session: AsyncSession, ctx: BusinessContext, data: ReceiptIn
 ) -> GoodsReceipt:
     """Record goods that arrived: stock goes up at the given cost, the order is updated."""
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
+    ctx.access.require(Module.INVENTORY)
     supplier = await get_supplier(session, ctx, data.supplier_id)
     order = None
     order_lines: dict[uuid.UUID, PurchaseOrderLine] = {}
@@ -451,7 +453,7 @@ async def list_invoices(
     supplier_id: uuid.UUID | None = None,
     limit: int = 200,
 ) -> list[SupplierInvoice]:
-    require(ctx.role, Permission.VIEW_PURCHASING)
+    require(ctx, Permission.VIEW_PURCHASING)
     query = select(SupplierInvoice).where(SupplierInvoice.business_id == ctx.business_id)
     if unpaid is not None:
         query = query.where(
@@ -471,7 +473,7 @@ async def list_invoices(
 async def get_invoice(
     session: AsyncSession, ctx: BusinessContext, invoice_id: uuid.UUID
 ) -> SupplierInvoice:
-    require(ctx.role, Permission.VIEW_PURCHASING)
+    require(ctx, Permission.VIEW_PURCHASING)
     invoice = await session.get(SupplierInvoice, invoice_id)
     if invoice is None or invoice.business_id != ctx.business_id:
         raise NotFound("Supplier invoice not found", code="supplier_invoice_not_found")
@@ -507,7 +509,7 @@ async def _check_invoice(
 async def create_invoice(
     session: AsyncSession, ctx: BusinessContext, data: SupplierInvoiceIn
 ) -> SupplierInvoice:
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
     supplier = await get_supplier(session, ctx, data.supplier_id)
     await _check_file(session, ctx, data.file_id)
     await _check_invoice(
@@ -571,7 +573,7 @@ async def update_invoice(
     invoice_id: uuid.UUID,
     patch: SupplierInvoicePatch,
 ) -> SupplierInvoice:
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
     invoice = await get_invoice(session, ctx, invoice_id)
     values: dict[str, Any] = {
         k: v
@@ -614,7 +616,7 @@ async def delete_invoice(
     session: AsyncSession, ctx: BusinessContext, invoice_id: uuid.UUID
 ) -> None:
     """Remove an invoice entered by mistake (the audit log keeps what it was)."""
-    require(ctx.role, Permission.MANAGE_PURCHASING)
+    require(ctx, Permission.MANAGE_PURCHASING)
     invoice = await get_invoice(session, ctx, invoice_id)
     await audit.record(
         session,

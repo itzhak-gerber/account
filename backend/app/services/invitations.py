@@ -38,9 +38,9 @@ def _status(invitation: Invitation) -> str:
 async def create_invitation(
     session: AsyncSession, ctx: BusinessContext, *, email: str, role: Role
 ) -> Invitation:
-    require(ctx.role, Permission.MANAGE_MEMBERS)
+    require(ctx, Permission.MANAGE_MEMBERS)
     if role == Role.OWNER:
-        require(ctx.role, Permission.MANAGE_OWNERS)
+        require(ctx, Permission.MANAGE_OWNERS)
     already_member = await session.scalar(
         select(BusinessMember.id)
         .join(User, User.id == BusinessMember.user_id)
@@ -106,7 +106,7 @@ async def create_invitation(
 
 
 async def list_pending(session: AsyncSession, ctx: BusinessContext) -> list[Invitation]:
-    require(ctx.role, Permission.MANAGE_MEMBERS)
+    require(ctx, Permission.MANAGE_MEMBERS)
     rows = await session.scalars(
         select(Invitation)
         .where(
@@ -121,12 +121,12 @@ async def list_pending(session: AsyncSession, ctx: BusinessContext) -> list[Invi
 
 
 async def revoke(session: AsyncSession, ctx: BusinessContext, invitation_id: uuid.UUID) -> None:
-    require(ctx.role, Permission.MANAGE_MEMBERS)
+    require(ctx, Permission.MANAGE_MEMBERS)
     invitation = await session.get(Invitation, invitation_id)
     if invitation is None or invitation.business_id != ctx.business_id:
         raise NotFound("Invitation not found", code="invitation_not_found")
     if invitation.role == Role.OWNER:
-        require(ctx.role, Permission.MANAGE_OWNERS)
+        require(ctx, Permission.MANAGE_OWNERS)
     if invitation.revoked_at is None and invitation.accepted_at is None:
         invitation.revoked_at = datetime.now(UTC)
         await session.flush()

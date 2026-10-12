@@ -11,7 +11,7 @@ from app.core.db import set_rls_context
 from app.core.errors import Conflict, Forbidden, MfaRequired, NotFound
 from app.models import Business, BusinessMember, Role, User
 from app.schemas.identity import BusinessIn, BusinessPatch, MemberOut
-from app.services import audit
+from app.services import audit, billing
 from app.services.permissions import Permission, has_permission, require
 
 
@@ -32,6 +32,7 @@ async def create_business(
     member = BusinessMember(business_id=business_id, user_id=principal.user_id, role=Role.OWNER)
     session.add(member)
     await session.flush()
+    await billing.start_trial(session, business_id, principal.user_id)
     await audit.record(
         session,
         principal,
@@ -55,7 +56,7 @@ async def list_for_user(session: AsyncSession, principal: Principal) -> list[tup
 
 
 async def get_business(session: AsyncSession, ctx: BusinessContext) -> Business:
-    require(ctx.role, Permission.VIEW_BUSINESS)
+    require(ctx, Permission.VIEW_BUSINESS)
     business = await session.get(Business, ctx.business_id)
     if business is None:
         raise NotFound("Business not found", code="business_not_found")
@@ -65,7 +66,7 @@ async def get_business(session: AsyncSession, ctx: BusinessContext) -> Business:
 async def update_business(
     session: AsyncSession, ctx: BusinessContext, patch: BusinessPatch
 ) -> Business:
-    require(ctx.role, Permission.MANAGE_BUSINESS)
+    require(ctx, Permission.MANAGE_BUSINESS)
     business = await get_business(session, ctx)
     changes: dict[str, dict[str, object]] = {}
     for field, value in patch.model_dump(exclude_unset=True).items():
@@ -91,7 +92,7 @@ async def update_business(
 
 
 async def list_members(session: AsyncSession, ctx: BusinessContext) -> list[MemberOut]:
-    require(ctx.role, Permission.VIEW_MEMBERS)
+    require(ctx, Permission.VIEW_MEMBERS)
     rows = await session.execute(
         select(BusinessMember, User)
         .join(User, User.id == BusinessMember.user_id)
@@ -132,13 +133,13 @@ async def _owner_count(session: AsyncSession, business_id: uuid.UUID) -> int:
 async def change_member_role(
     session: AsyncSession, ctx: BusinessContext, member_id: uuid.UUID, new_role: Role
 ) -> BusinessMember:
-    require(ctx.role, Permission.MANAGE_MEMBERS)
+    require(ctx, Permission.MANAGE_MEMBERS)
     member = await _get_member(session, ctx, member_id)
     old_role = Role(member.role)
     if old_role == new_role:
         return member
     if Role.OWNER in (old_role, new_role):
-        require(ctx.role, Permission.MANAGE_OWNERS)
+        require(ctx, Permission.MANAGE_OWNERS)
     if old_role == Role.OWNER and await _owner_count(session, ctx.business_id) <= 1:
         raise Conflict("A business must keep at least one owner", code="last_owner")
     member.role = new_role
@@ -159,7 +160,7 @@ async def remove_member(session: AsyncSession, ctx: BusinessContext, member_id: 
     member = await _get_member(session, ctx, member_id)
     leaving_self = member.user_id == ctx.principal.user_id
     if not leaving_self:
-        require(ctx.role, Permission.MANAGE_MEMBERS)
+        require(ctx, Permission.MANAGE_MEMBERS)
         if member.role == Role.OWNER and not has_permission(ctx.role, Permission.MANAGE_OWNERS):
             raise Forbidden("Only owners can remove owners", code="permission_denied")
     if member.role == Role.OWNER and await _owner_count(session, ctx.business_id) <= 1:
