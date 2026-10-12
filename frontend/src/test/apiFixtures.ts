@@ -14,7 +14,13 @@ const BUSINESS = {
   default_currency: "ILS",
   has_logo: false,
 };
-const USER = { id: "u1", email: "owner@example.com", full_name: "אורן כהן" };
+const USER = {
+  id: "u1",
+  email: "owner@example.com",
+  full_name: "אורן כהן",
+  theme: "system" as const,
+  text_size: "device" as const,
+};
 export const ME = {
   user: USER,
   memberships: [{ business: BUSINESS, role: "owner" }],
@@ -308,6 +314,7 @@ export function fixtureBody(url: string, me: unknown = ME): unknown {
   const path = url.replace(/^\/api\/v1/, "").split("?")[0];
   const routes: [RegExp, unknown][] = [
     [/^\/me$/, me],
+    [/^\/health$/, { status: "ok", version: "0.1.0", environment: "dev", database: "ok" }],
     [
       /^\/me\/devices$/,
       [

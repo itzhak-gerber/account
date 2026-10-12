@@ -21,7 +21,10 @@ export function LandingPage() {
         display: "grid",
         placeItems: "center",
         p: 2,
-        background: "linear-gradient(160deg, #eef2ff 0%, #f5f7fb 60%)",
+        background: (theme) =>
+          theme.palette.mode === "dark"
+            ? "linear-gradient(160deg, #1a2238 0%, #121417 60%)"
+            : "linear-gradient(160deg, #eef2ff 0%, #f5f7fb 60%)",
       }}
     >
       <Stack spacing={3} sx={{ maxWidth: 520, textAlign: "center", alignItems: "center" }}>

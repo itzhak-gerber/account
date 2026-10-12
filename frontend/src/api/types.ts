@@ -1,10 +1,15 @@
 export type Role = "owner" | "admin" | "accountant" | "member" | "viewer";
 export type BusinessType = "exempt_dealer" | "licensed_dealer" | "company" | "nonprofit";
 
+export type ThemePreference = "system" | "light" | "dark";
+export type TextSize = "device" | "large" | "xlarge";
+
 export interface User {
   id: string;
   email: string;
   full_name: string;
+  theme: ThemePreference;
+  text_size: TextSize;
 }
 
 export interface Business {

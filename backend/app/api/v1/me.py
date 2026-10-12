@@ -4,9 +4,16 @@ from fastapi import APIRouter, Depends
 
 from app.auth.principal import CurrentPrincipal, DbSession, get_session_store
 from app.auth.sessions import SessionStore
+from app.core.db import commit
 from app.core.errors import NotFound
 from app.models import User
-from app.schemas.identity import BusinessOut, MembershipOut, MeOut, UserOut
+from app.schemas.identity import (
+    BusinessOut,
+    DisplayPreferencesIn,
+    MembershipOut,
+    MeOut,
+    UserOut,
+)
 from app.services import businesses
 
 router = APIRouter(tags=["me"])
@@ -35,3 +42,20 @@ async def me(
         mfa=principal.mfa,
         csrf_token=csrf_token,
     )
+
+
+@router.patch("/me/display-preferences")
+async def set_display_preferences(
+    body: DisplayPreferencesIn, principal: CurrentPrincipal, session: DbSession
+) -> UserOut:
+    """Light / dark / device theme and text size, kept per user across devices."""
+    user = await session.get(User, principal.user_id)
+    if user is None:
+        raise NotFound()
+    if body.theme is not None:
+        user.theme = body.theme
+    if body.text_size is not None:
+        user.text_size = body.text_size
+    result = UserOut.model_validate(user)
+    await commit(session)
+    return result

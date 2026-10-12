@@ -27,12 +27,28 @@ class Role(enum.StrEnum):
     VIEWER = "viewer"
 
 
+class ThemePreference(enum.StrEnum):
+    SYSTEM = "system"  # follow the device's light / dark setting
+    LIGHT = "light"
+    DARK = "dark"
+
+
+class TextSize(enum.StrEnum):
+    DEVICE = "device"  # follow the device / browser text size
+    LARGE = "large"
+    XLARGE = "xlarge"
+
+
 def _in(values: type[enum.StrEnum]) -> str:
     return ", ".join(f"'{v.value}'" for v in values)
 
 
 class User(IdMixin, TimestampMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(f"theme IN ({_in(ThemePreference)})", name="theme"),
+        CheckConstraint(f"text_size IN ({_in(TextSize)})", name="text_size"),
+    )
 
     idp_subject: Mapped[str] = mapped_column(String(255), unique=True)
     email: Mapped[str] = mapped_column(CITEXT, unique=True)
@@ -40,6 +56,13 @@ class User(IdMixin, TimestampMixin, Base):
     locale: Mapped[str] = mapped_column(String(10), default="he")
     is_active: Mapped[bool] = mapped_column(default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Display preferences, kept per user so they follow them to every device.
+    theme: Mapped[ThemePreference] = mapped_column(
+        String(10), default=ThemePreference.SYSTEM, server_default=ThemePreference.SYSTEM.value
+    )
+    text_size: Mapped[TextSize] = mapped_column(
+        String(10), default=TextSize.DEVICE, server_default=TextSize.DEVICE.value
+    )
 
 
 class Business(IdMixin, TimestampMixin, Base):

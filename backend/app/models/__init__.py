@@ -21,7 +21,16 @@ from app.models.documents import (
     StoredFile,
     VatRate,
 )
-from app.models.identity import Business, BusinessMember, BusinessType, Invitation, Role, User
+from app.models.identity import (
+    Business,
+    BusinessMember,
+    BusinessType,
+    Invitation,
+    Role,
+    TextSize,
+    ThemePreference,
+    User,
+)
 from app.models.inventory import MovementKind, StockLevel, StockMovement
 from app.models.ita import AllocationRequest, AllocationStatus, ItaConnection
 from app.models.notifications import (
@@ -85,6 +94,8 @@ __all__ = [
     "StoredFile",
     "Supplier",
     "SupplierInvoice",
+    "TextSize",
+    "ThemePreference",
     "User",
     "UserDevice",
     "VatRate",

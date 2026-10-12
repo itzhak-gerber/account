@@ -6,7 +6,7 @@ from typing import Annotated, Any
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
-from app.models import BusinessType, Role
+from app.models import BusinessType, Role, TextSize, ThemePreference
 
 
 def israeli_id_checksum_ok(value: str) -> bool:
@@ -38,6 +38,13 @@ class UserOut(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str
+    theme: ThemePreference
+    text_size: TextSize
+
+
+class DisplayPreferencesIn(BaseModel):
+    theme: ThemePreference | None = None
+    text_size: TextSize | None = None
 
 
 class BusinessIn(BaseModel):

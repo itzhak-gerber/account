@@ -23,7 +23,13 @@ const BUSINESS = {
 
 function me(overrides: Partial<Me> = {}): Me {
   return {
-    user: { id: "u1", email: "owner@example.com", full_name: "ישראל ישראלי" },
+    user: {
+      id: "u1",
+      email: "owner@example.com",
+      full_name: "ישראל ישראלי",
+      theme: "system",
+      text_size: "device",
+    },
     memberships: [{ business: BUSINESS, role: "owner" }],
     mfa: true,
     csrf_token: "csrf",

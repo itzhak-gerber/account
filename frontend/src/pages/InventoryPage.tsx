@@ -26,11 +26,12 @@ import { MovementsDialog } from "../features/inventory/MovementsDialog";
 import { formatMoney } from "../lib/money";
 
 const qty = (value: string | number) => Number(value).toLocaleString("he-IL");
-// Read by screen readers only (a column heading without visible text).
+// Read by screen readers only (a column heading without visible text). Sizes are strings:
+// in MUI's sx a bare 1 means 100%.
 const SR_ONLY = {
   position: "absolute",
-  width: 1,
-  height: 1,
+  width: "1px",
+  height: "1px",
   overflow: "hidden",
   clipPath: "inset(50%)",
   whiteSpace: "nowrap",
@@ -91,7 +92,7 @@ export function InventoryPage() {
                     <TableCell align="left">{t("inventory.minimum")}</TableCell>
                     <TableCell align="left">{t("inventory.averageCost")}</TableCell>
                     <TableCell align="left">{t("inventory.value")}</TableCell>
-                    <TableCell>
+                    <TableCell sx={{ position: "relative" }}>
                       <Box component="span" sx={SR_ONLY}>
                         {t("inventory.actions")}
                       </Box>

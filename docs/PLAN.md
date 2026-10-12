@@ -290,6 +290,18 @@ Safety: tools never issue documents implicitly. Every MCP action is audited with
   receive payment) · customers · items · reports · business settings (details, logo,
   numbering start, users and roles, MCP/API connections) · profile and security.
 - Accessibility: WCAG 2.1 AA, which is also required by Israeli accessibility regulations.
+- Display preferences (profile → תצוגה), saved on the user (`users.theme`, `users.text_size`,
+  `PATCH /me/display-preferences`) so they follow the user to every device, with a copy in
+  the browser for the sign-in page and first paint:
+  - Theme: by device (default, `prefers-color-scheme`), light, or dark. PDFs stay light
+    (they are for printing). The installed app's status bar colour follows the mode.
+  - Text size: by device (default), large (112.5%), very large (125%). All sizes are in rem,
+    so the root font size scales the whole app. "By device" keeps the browser's size; on
+    iPhone/iPad it uses `font: -apple-system-body`, so the system text size (Dynamic Type)
+    applies, which web pages otherwise ignore.
+  - `scripts/a11y-browser.mjs` runs every screen in light, dark and very large text, at desktop
+    and phone size, and fails on contrast problems or a page that scrolls sideways.
+  - The sign-in screens are Keycloak's and stay light.
 
 ---
 

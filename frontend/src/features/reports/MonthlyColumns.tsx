@@ -77,7 +77,7 @@ export function MonthlyColumns({
                   insetInline: 0,
                   bottom: `${(tick / max) * 100}%`,
                   borderTop: 1,
-                  borderColor: "grey.200",
+                  borderColor: "divider",
                 }}
               />
             ))}

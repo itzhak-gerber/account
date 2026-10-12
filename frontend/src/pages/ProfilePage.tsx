@@ -17,6 +17,7 @@ import { useSession } from "../auth/context";
 import { DevicesCard } from "../features/notifications/DevicesCard";
 import { PreferencesCard } from "../features/notifications/PreferencesCard";
 import { PushCard } from "../features/notifications/PushCard";
+import { DisplayCard } from "../features/profile/DisplayCard";
 import { errorMessage } from "../lib/errors";
 
 export function ProfilePage() {
@@ -47,6 +48,7 @@ export function ProfilePage() {
           </Typography>
         </CardContent>
       </Card>
+      <DisplayCard />
       <PreferencesCard />
       <PushCard />
       <Card variant="outlined">

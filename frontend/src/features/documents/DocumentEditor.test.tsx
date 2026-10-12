@@ -20,7 +20,13 @@ const BUSINESS = {
   has_logo: false,
 };
 const ME = {
-  user: { id: "u1", email: "owner@example.com", full_name: "ישראל" },
+  user: {
+    id: "u1",
+    email: "owner@example.com",
+    full_name: "ישראל",
+    theme: "system",
+    text_size: "device",
+  },
   memberships: [{ business: BUSINESS, role: "owner" }],
   mfa: true,
   csrf_token: "csrf",
