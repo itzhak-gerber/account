@@ -44,6 +44,8 @@ jobs:
       ITA_ENVIRONMENT: ${{ fromJSON(vars.AZURE_ENV).itaEnvironment || 'sandbox' }}
       # Timestamp service of the certificate authority (optional) for signed PDFs.
       PDF_SIGNING_TSA_URL: ${{ fromJSON(vars.AZURE_ENV).pdfSigningTsaUrl || '' }}
+      # Sign-in emails of the software's operators (plans and billing), comma-separated.
+      OPERATOR_EMAILS: ${{ fromJSON(vars.AZURE_ENV).operatorEmails || '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -223,6 +225,7 @@ jobs:
                          itaClientId="$ITA_CLIENT_ID" itaEnabled="$ITA_ENABLED" \
                          itaEnvironment="$ITA_ENVIRONMENT" \
                          pdfSigningTsaUrl="$PDF_SIGNING_TSA_URL" \
+                         operatorEmails="$OPERATOR_EMAILS" \
             --query properties.outputs -o json > apps.json
           echo "app_url=$(jq -r .appUrl.value apps.json)" >> "$GITHUB_OUTPUT"
           echo "auth_url=$(jq -r .authUrl.value apps.json)" >> "$GITHUB_OUTPUT"

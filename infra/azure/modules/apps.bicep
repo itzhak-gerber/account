@@ -18,6 +18,7 @@ param itaClientId string
 param itaEnabled string
 param itaEnvironment string
 param pdfSigningTsaUrl string
+param operatorEmails string
 
 var appHost = 'invoice.${defaultDomain}'
 var appUrl = 'https://${appHost}'
@@ -84,6 +85,7 @@ var backendEnv = [
   { name: 'APP_PDF_SIGNING_P12', secretRef: 'pdf-signing-p12' }
   { name: 'APP_PDF_SIGNING_PASSWORD', secretRef: 'pdf-signing-password' }
   { name: 'APP_PDF_SIGNING_TSA_URL', value: pdfSigningTsaUrl }
+  { name: 'APP_OPERATOR_EMAILS', value: empty(operatorEmails) ? '[]' : string(split(operatorEmails, ',')) }
   { name: 'APP_ANTHROPIC_API_KEY', secretRef: 'anthropic-api-key' }
   { name: 'APP_EMAIL_FROM', value: 'חשבוניות <${smtpFrom}>' }
   { name: 'APP_STORAGE_BACKEND', value: 'azure' }

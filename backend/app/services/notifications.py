@@ -50,6 +50,7 @@ DEFAULTS: dict[NotificationEvent, dict[str, bool]] = {
     NotificationEvent.DAILY_SUMMARY: {"in_app": False, "email": True, "push": False},
     NotificationEvent.NEW_DEVICE_LOGIN: {"in_app": True, "email": True, "push": True},
     NotificationEvent.LOW_STOCK: {"in_app": True, "email": False, "push": True},
+    NotificationEvent.PLAN: {"in_app": True, "email": True, "push": False},
 }
 
 MANAGERS = frozenset({Role.OWNER, Role.ADMIN})
@@ -62,6 +63,7 @@ EVENT_ROLES: dict[NotificationEvent, frozenset[Role]] = {
     NotificationEvent.DAILY_SUMMARY: MANAGERS | {Role.ACCOUNTANT},
     NotificationEvent.NEW_DEVICE_LOGIN: frozenset(),  # the account holder (see devices.py)
     NotificationEvent.LOW_STOCK: MANAGERS | {Role.MEMBER},
+    NotificationEvent.PLAN: MANAGERS,
 }
 
 
@@ -181,6 +183,51 @@ def _from_low_stock(event_id: uuid.UUID, payload: dict[str, Any]) -> Message:
     )
 
 
+def _from_plan_expiring(payload: dict[str, Any]) -> Message:
+    days = int(payload["days"])
+    ends = _he_date(date.fromisoformat(payload["ends_on"]))
+    if days == 0:
+        title = "התוכנית של העסק הסתיימה"
+        body = (
+            "העסק עבר למצב קריאה בלבד: אפשר לצפות ולייצא, אבל לא להפיק מסמכים חדשים. "
+            "כדי להמשיך, בחרו תוכנית."
+        )
+    else:
+        title = f"התוכנית של העסק מסתיימת בעוד {days} ימים"
+        body = f"התוכנית בתוקף עד {ends}. אחרי זה העסק יעבור למצב קריאה בלבד."
+    return Message(
+        event=NotificationEvent.PLAN,
+        title=title,
+        body=body,
+        link="/settings?tab=plan",
+        dedupe_key=f"plan_expiring:{payload['subscription_id']}:{days}",
+        roles=EVENT_ROLES[NotificationEvent.PLAN],
+    )
+
+
+def _from_plan_quota(payload: dict[str, Any]) -> Message:
+    what = "מסמכים" if payload["kind"] == "document" else "סריקות"
+    used, quota = int(payload["used"]), int(payload["quota"])
+    if used >= quota:
+        title = f"נוצלה מכסת ה{what} החודשית"
+        body = f"נוצלו {used} מתוך {quota} {what} החודש. " + (
+            "מסמכים נוספים יחויבו לפי התוכנית."
+            if payload["kind"] == "document"
+            else "סריקות נוספות יחויבו או ייחסמו, לפי התוכנית."
+        )
+    else:
+        title = f"נוצלו 80% ממכסת ה{what} החודשית"
+        body = f"נוצלו {used} מתוך {quota} {what} החודש."
+    return Message(
+        event=NotificationEvent.PLAN,
+        title=title,
+        body=body,
+        link="/settings?tab=plan",
+        dedupe_key=f"plan_quota:{payload['kind']}:{payload['month']}:{payload['level']}",
+        roles=EVENT_ROLES[NotificationEvent.PLAN],
+    )
+
+
 def _from_member_joined(event_id: uuid.UUID, payload: dict[str, Any]) -> Message:
     name = payload.get("name") or payload.get("email", "")
     return Message(
@@ -267,6 +314,10 @@ async def message_for(
         return _from_low_stock(event_id, payload)
     if event_type == "member.joined":
         return _from_member_joined(event_id, payload)
+    if event_type == "plan.expiring":
+        return _from_plan_expiring(payload)
+    if event_type == "plan.quota":
+        return _from_plan_quota(payload)
     if event_type == "business.daily_summary":
         return await _from_daily_summary(session, business_id, payload)
     return None  # not every event notifies anyone

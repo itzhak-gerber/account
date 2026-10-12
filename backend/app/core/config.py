@@ -41,6 +41,9 @@ class Settings(BaseSettings):
 
     # Owners and admins must sign in with two-factor authentication.
     require_mfa_for_admins: bool = True
+    # The software's operators (plans, subscriptions, billing): sign-in emails, with
+    # two-factor authentication. Not a business role.
+    operator_emails: list[str] = []
 
     invitation_ttl_days: int = 7
 

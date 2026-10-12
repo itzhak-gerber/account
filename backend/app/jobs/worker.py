@@ -296,6 +296,17 @@ async def raise_daily_summaries(ctx: dict[str, Any]) -> int:
     return int(count or 0)
 
 
+async def raise_plan_reminders(ctx: dict[str, Any]) -> int:
+    """Daily: tell the managers 14 and 3 days before their plan ends, and on the day."""
+    async with get_sessionmaker()() as session:
+        count = await session.scalar(text("SELECT enqueue_plan_reminders(:day)"), {"day": today()})
+        await session.commit()
+    log.info("plan_reminders.raised", count=count)
+    if count:
+        await dispatch_outbox(ctx)
+    return int(count or 0)
+
+
 class WorkerSettings:
     functions: ClassVar[list[Any]] = [
         ping,
@@ -310,6 +321,7 @@ class WorkerSettings:
         func(dispatch_outbox, name=events.DISPATCH_JOB, keep_result=0),
         raise_overdue_events,
         raise_daily_summaries,
+        raise_plan_reminders,
     ]
     cron_jobs: ClassVar[list[Any]] = [
         # A safety net for events whose "kick" was lost (e.g. Redis was briefly down).
@@ -317,6 +329,7 @@ class WorkerSettings:
         cron(raise_overdue_events, hour={8}, minute={5}),  # 08:05 Israel time
         # Before the overdue check, so the summary counts yesterday's state.
         cron(raise_daily_summaries, hour={7}, minute={30}),
+        cron(raise_plan_reminders, hour={8}, minute={10}),
     ]
     timezone = ZoneInfo(get_settings().timezone)
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

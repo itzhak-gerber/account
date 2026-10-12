@@ -118,6 +118,12 @@ fields are suggested; without one, the file is kept and the fields are typed by 
 key at console.anthropic.com and store it only in Key Vault, then run Deploy:
 `az keyvault secret set --vault-name <vault> -n anthropic-api-key --value '<key>'`.
 
+## Operators (plans, subscriptions and billing)
+
+The management screens (`/admin`) are open only to the operators' sign-in emails, with
+two-factor authentication. Add them to `AZURE_ENV`, comma-separated, then run Deploy:
+`"operatorEmails": "you@example.com"`. They are identifiers, not secrets.
+
 ## Useful commands (Cloud Shell)
 
 ```bash

@@ -125,3 +125,31 @@ def notification_email(
         'אפשר לבחור אילו התראות יגיעו במייל במסך "פרופיל ואבטחה".'
     )
     return Email(to=to, subject=subject, html=html, text=text)
+
+
+def upgrade_request_email(
+    *,
+    to: str,
+    business_name: str,
+    tax_id: str,
+    requested_by: str,
+    wanted: str,
+    message: str,
+    link: str,
+) -> Email:
+    """To an operator: a business asked to upgrade its plan."""
+    subject = f"בקשת שדרוג: {business_name}"
+    rows = [("עסק", f"{business_name} ({tax_id})"), ("ביקש/ה", requested_by), ("מבוקש", wanted)]
+    if message:
+        rows.append(("הודעה", message))
+    html = _layout(
+        f'<h2 style="margin-top:0">{escape(subject)}</h2><table style="border-collapse:collapse">'
+        + "".join(
+            f'<tr><td style="padding:4px 0 4px 16px;color:#6b7280">{escape(k)}</td>'
+            f"<td>{escape(v)}</td></tr>"
+            for k, v in rows
+        )
+        + f'</table><p><a href="{escape(link)}">לניהול המנויים</a></p>'
+    )
+    text = "\n".join(f"{k}: {v}" for k, v in rows) + f"\n{link}"
+    return Email(to=to, subject=subject, html=html, text=text)

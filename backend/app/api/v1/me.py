@@ -7,6 +7,7 @@ from app.auth.sessions import SessionStore
 from app.core.db import commit
 from app.core.errors import NotFound
 from app.models import User
+from app.schemas.billing import PlanSummary
 from app.schemas.identity import (
     BusinessOut,
     DisplayPreferencesIn,
@@ -14,7 +15,7 @@ from app.schemas.identity import (
     MeOut,
     UserOut,
 )
-from app.services import businesses
+from app.services import billing, businesses, plans
 
 router = APIRouter(tags=["me"])
 
@@ -33,13 +34,25 @@ async def me(
     if principal.session_id:
         data = await store.get(principal.session_id)
         csrf_token = data.csrf_token if data else None
+    out = []
+    for b, role in memberships:
+        access = billing.access_of(await billing.current_subscription(session, b.id))
+        out.append(
+            MembershipOut(
+                business=BusinessOut.from_business(b),
+                role=role,
+                plan=PlanSummary(
+                    read_only=access.read_only,
+                    modules=sorted(access.modules),
+                    ends_on=access.ends_on,
+                ),
+            )
+        )
     return MeOut(
         user=UserOut.model_validate(user),
-        memberships=[
-            MembershipOut(business=BusinessOut.from_business(b), role=role)
-            for b, role in memberships
-        ],
+        memberships=out,
         mfa=principal.mfa,
+        is_operator=plans.is_operator(principal),
         csrf_token=csrf_token,
     )
 

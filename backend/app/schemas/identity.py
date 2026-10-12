@@ -7,6 +7,7 @@ from typing import Annotated, Any
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
 from app.models import BusinessType, Role, TextSize, ThemePreference
+from app.schemas.billing import PlanSummary
 
 
 def israeli_id_checksum_ok(value: str) -> bool:
@@ -100,12 +101,14 @@ class BusinessOut(BaseModel):
 class MembershipOut(BaseModel):
     business: BusinessOut
     role: Role
+    plan: PlanSummary | None = None
 
 
 class MeOut(BaseModel):
     user: UserOut
     memberships: list[MembershipOut]
     mfa: bool
+    is_operator: bool = False
     csrf_token: str | None = None
 
 

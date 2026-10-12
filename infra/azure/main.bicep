@@ -45,6 +45,8 @@ param itaEnabled string = 'false'
 param itaEnvironment string = 'sandbox'
 @description('Timestamp service (RFC 3161) for signed PDFs, or empty.')
 param pdfSigningTsaUrl string = ''
+@description('Sign-in emails of the software operators (plans and billing), comma-separated.')
+param operatorEmails string = ''
 
 var tags = {
   app: prefix
@@ -363,6 +365,7 @@ module apps 'modules/apps.bicep' = if (stage == 'apps') {
     itaEnabled: itaEnabled
     itaEnvironment: itaEnvironment
     pdfSigningTsaUrl: pdfSigningTsaUrl
+    operatorEmails: operatorEmails
   }
   dependsOn: [registryPull, vaultSecretsUser, storageBlobContributor, smtpUser, filesContainer]
 }

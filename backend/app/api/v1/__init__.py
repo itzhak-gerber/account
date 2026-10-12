@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin,
     businesses,
     catalog,
     documents,
@@ -10,6 +11,7 @@ from app.api.v1 import (
     ita,
     me,
     notifications,
+    plan,
     purchasing,
     reports,
     system,
@@ -28,3 +30,5 @@ router.include_router(exports.router)
 router.include_router(inventory.router)
 router.include_router(purchasing.router)
 router.include_router(ita.router)
+router.include_router(plan.router)
+router.include_router(admin.router)

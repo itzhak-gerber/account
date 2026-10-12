@@ -23,6 +23,7 @@ from app.models import (
     UsageEvent,
     UsageKind,
 )
+from app.services import events
 from app.services.access import Access, QuotaExceeded
 
 ISRAEL = ZoneInfo("Asia/Jerusalem")
@@ -171,8 +172,9 @@ async def record_usage(
         return None
     month = month_of(today())
     quota = subscription.terms.get(_QUOTA[kind])
+    used = await used_this_month(session, business_id, kind, month)
     overage: Decimal | None = None
-    if quota is not None and await used_this_month(session, business_id, kind, month) >= quota:
+    if quota is not None and used >= quota:
         price = subscription.terms.get(_OVERAGE[kind])
         overage = Decimal(price) if price is not None else Decimal("0")
     event = UsageEvent(
@@ -185,4 +187,31 @@ async def record_usage(
     )
     session.add(event)
     await session.flush()
+    if quota:
+        _alert_on_threshold(business_id, kind, month, used + 1, quota, session)
     return event
+
+
+def _alert_on_threshold(
+    business_id: uuid.UUID,
+    kind: UsageKind,
+    month: date,
+    used: int,
+    quota: int,
+    session: AsyncSession,
+) -> None:
+    """Tell the managers once at 80% of the month's quota, and once when it is used up."""
+    for level, mark in ((80, -(-quota * 8 // 10)), (100, quota)):
+        if used == mark and (level == 100 or mark < quota):  # small quotas: one alert
+            events.emit(
+                session,
+                business_id,
+                "plan.quota",
+                {
+                    "kind": kind.value,
+                    "used": used,
+                    "quota": quota,
+                    "level": level,
+                    "month": month.isoformat(),
+                },
+            )

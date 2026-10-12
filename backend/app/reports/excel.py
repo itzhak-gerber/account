@@ -13,6 +13,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from app.models import DocumentType, PaymentMethod
 from app.pdf.render import PAYMENT_LABELS
+from app.schemas.billing import BillingReport
 from app.schemas.reports import (
     AgingTotals,
     IncomeDocument,
@@ -286,4 +287,40 @@ def export_xlsx(
             ["ספק", "מספר חשבונית", "תאריך", "לתשלום עד", "לפני מע״מ", "מע״מ", "סה״כ", "שולם"],
             supplier_invoices,
         )
+    return _save(workbook)
+
+
+def billing_xlsx(report: BillingReport) -> bytes:
+    """The operator's monthly billing: what to charge each business (before VAT)."""
+    workbook = Workbook()
+    sheet = _sheet(workbook, "חיובים", "חיובי לקוחות", f"{report.month:%m/%Y} · לפני מע״מ")
+    _table(
+        sheet,
+        [
+            "עסק",
+            "מספר עוסק",
+            "תוכניות שנרכשו",
+            "דמי תוכנית",
+            "מסמכים בחריגה",
+            "חיוב מסמכים",
+            "סריקות בחריגה",
+            "חיוב סריקות",
+            "סה״כ",
+        ],
+        [
+            [
+                r.business_name,
+                r.tax_id,
+                ", ".join(r.plan_names),
+                r.plan_charges,
+                r.documents_over,
+                r.documents_over_amount,
+                r.scans_over,
+                r.scans_over_amount,
+                r.total,
+            ]
+            for r in report.rows
+        ],
+        totals=["סה״כ", None, None, None, None, None, None, None, report.total],
+    )
     return _save(workbook)
